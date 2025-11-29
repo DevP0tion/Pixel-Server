@@ -1,84 +1,85 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { io, type Socket } from 'socket.io-client';
-
-	// Unity 서버 정보 인터페이스
-	interface UnityServerInfo {
-		id: string;
-		connectedAt: string;
-	}
+	import { socketManager, type UnityServerInfo } from '$lib/socket';
 
 	// 상태
-	let socket: Socket | null = $state(null);
 	let isConnected = $state(false);
 	let unityServers: UnityServerInfo[] = $state([]);
 
-	// 소켓 연결
-	function connectSocket() {
-		if (socket) {
-			socket.disconnect();
+	// 이벤트 리스너 정리를 위한 배열
+	let eventCleanupFns: Array<() => void> = [];
+
+	// 이벤트 핸들러 등록
+	function setupSocketEventHandlers() {
+		// 이벤트 리스너 헬퍼 함수
+		function addEventHandler(event: string, handler: (...args: unknown[]) => void) {
+			socketManager.on(event, handler);
+			eventCleanupFns.push(() => socketManager.off(event, handler));
 		}
 
-		socket = io('http://localhost:7777', {
-			transports: ['websocket', 'polling'],
-			query: {
-				clientType: 'web'
-			}
-		});
-
-		socket.on('connect', () => {
+		addEventHandler('connect', () => {
 			isConnected = true;
 			// Unity 서버 목록 요청
-			socket?.emit('unity:list');
+			socketManager.sendSocketEvent('unity:list');
 		});
 
-		socket.on('disconnect', () => {
+		addEventHandler('disconnect', () => {
 			isConnected = false;
 			unityServers = [];
 		});
 
 		// 환영 메시지에서 Unity 서버 목록 받기
-		socket.on('welcome', (data) => {
-			if (data.unityServers) {
-				unityServers = data.unityServers;
+		addEventHandler('welcome', (data: unknown) => {
+			const welcomeData = data as { unityServers?: UnityServerInfo[] };
+			if (welcomeData.unityServers) {
+				unityServers = welcomeData.unityServers;
 			}
 		});
 
 		// Unity 서버 목록 응답
-		socket.on('unity:list', (data) => {
-			if (data.unityServers) {
-				unityServers = data.unityServers;
+		addEventHandler('unity:list', (data: unknown) => {
+			const listData = data as { unityServers?: UnityServerInfo[] };
+			if (listData.unityServers) {
+				unityServers = listData.unityServers;
 			}
 		});
 
 		// Unity 서버 연결 알림
-		socket.on('unity:connected', (data) => {
-			if (data.unityServers) {
-				unityServers = data.unityServers;
+		addEventHandler('unity:connected', (data: unknown) => {
+			const connData = data as { unityServers?: UnityServerInfo[] };
+			if (connData.unityServers) {
+				unityServers = connData.unityServers;
 			}
 		});
 
 		// Unity 서버 연결 해제 알림
-		socket.on('unity:disconnected', (data) => {
-			if (data.unityServers) {
-				unityServers = data.unityServers;
+		addEventHandler('unity:disconnected', (data: unknown) => {
+			const discData = data as { unityServers?: UnityServerInfo[] };
+			if (discData.unityServers) {
+				unityServers = discData.unityServers;
 			}
 		});
 
 		// Unity 서버 강제 연결 해제 응답
-		socket.on('unity:disconnect:response', (response) => {
-			if (response.code === 100) {
-				console.log(response.message);
+		addEventHandler('unity:disconnect:response', (response: unknown) => {
+			const res = response as { code: number; message: string };
+			if (res.code === 100) {
+				console.log(res.message);
 			} else {
-				console.error(response.message);
+				console.error(res.message);
 			}
 		});
 	}
 
+	// 소켓 재연결
+	function reconnectSocket() {
+		socketManager.reconnect();
+	}
+
 	// Unity 서버 강제 연결 해제
 	function disconnectUnityServer(unitySocketId: string) {
-		if (socket && isConnected) {
-			socket.emit('unity:disconnect', { unitySocketId });
+		if (isConnected) {
+			socketManager.sendSocketEvent('unity:disconnect', { unitySocketId });
 		}
 	}
 
@@ -114,13 +115,26 @@
 	}
 
 	onMount(() => {
-		connectSocket();
+		// 현재 연결 상태 동기화
+		isConnected = socketManager.isConnected;
+		unityServers = socketManager.unityServers;
+
+		// 이벤트 핸들러 등록
+		setupSocketEventHandlers();
+
+		// 아직 연결되지 않은 경우 연결 시도
+		if (!isConnected) {
+			socketManager.connect();
+		} else {
+			// 이미 연결되어 있으면 Unity 서버 목록 요청
+			socketManager.sendSocketEvent('unity:list');
+		}
 	});
 
 	onDestroy(() => {
-		if (socket) {
-			socket.disconnect();
-		}
+		// 이벤트 리스너만 정리 (소켓 연결은 유지)
+		eventCleanupFns.forEach((cleanup) => cleanup());
+		eventCleanupFns = [];
 	});
 </script>
 
@@ -139,7 +153,7 @@
 			</div>
 		</div>
 		<div class="header-right">
-			<button class="btn btn-primary" onclick={connectSocket}>새로고침</button>
+			<button class="btn btn-primary" onclick={reconnectSocket}>새로고침</button>
 		</div>
 	</header>
 
