@@ -69,6 +69,50 @@ interface ConnectedClient {
  */
 type CommandHandler = (socket: Socket, args: unknown) => void;
 
+// Type guards for packet validation
+function isAuthPacket(args: unknown): args is AuthPacket {
+	return (
+		typeof args === 'object' &&
+		args !== null &&
+		'username' in args &&
+		'password' in args &&
+		typeof (args as AuthPacket).username === 'string' &&
+		typeof (args as AuthPacket).password === 'string'
+	);
+}
+
+function isMovePacket(args: unknown): args is MovePacket {
+	if (typeof args !== 'object' || args === null) return false;
+	const packet = args as MovePacket;
+	return (
+		typeof packet.direction === 'object' &&
+		packet.direction !== null &&
+		typeof packet.direction.x === 'number' &&
+		typeof packet.direction.y === 'number' &&
+		typeof packet.canceled === 'boolean'
+	);
+}
+
+function isBulletPacket(args: unknown): args is BulletPacket {
+	if (typeof args !== 'object' || args === null) return false;
+	const packet = args as BulletPacket;
+	return (
+		typeof packet.typeName === 'string' &&
+		typeof packet.teamName === 'string' &&
+		typeof packet.damage === 'number' &&
+		typeof packet.startPos === 'object' &&
+		packet.startPos !== null &&
+		typeof packet.startPos.x === 'number' &&
+		typeof packet.startPos.y === 'number' &&
+		typeof packet.startPos.z === 'number' &&
+		typeof packet.targetPos === 'object' &&
+		packet.targetPos !== null &&
+		typeof packet.targetPos.x === 'number' &&
+		typeof packet.targetPos.y === 'number' &&
+		typeof packet.targetPos.z === 'number'
+	);
+}
+
 /**
  * 소켓 서버로부터 명령을 수신하고 처리하는 클래스입니다.
  * 명령어 데이터 형식: {cmd: string, args: {}}
@@ -171,11 +215,31 @@ class SocketCommandHandler {
 // 연결된 클라이언트 맵
 const connectedClients: Map<string, ConnectedClient> = new Map();
 
-// 계정 정보 (AccountManager와 유사)
-const accounts: Map<string, string> = new Map([
-	['admin', 'admin123'],
-	['user', 'user123']
-]);
+// 계정 정보 - 환경변수에서 로드하거나 기본값 사용 (개발용)
+// 프로덕션에서는 GAME_ACCOUNTS 환경변수를 "user1:pass1,user2:pass2" 형식으로 설정
+function loadAccounts(): Map<string, string> {
+	const accountsEnv = process.env.GAME_ACCOUNTS;
+	if (accountsEnv) {
+		const accounts = new Map<string, string>();
+		accountsEnv.split(',').forEach((pair) => {
+			const [username, password] = pair.split(':');
+			if (username && password) {
+				accounts.set(username.trim(), password.trim());
+			}
+		});
+		if (accounts.size > 0) {
+			return accounts;
+		}
+	}
+	// 개발용 기본 계정 (프로덕션에서는 환경변수 사용 권장)
+	console.warn('[Auth] GAME_ACCOUNTS 환경변수가 설정되지 않았습니다. 기본 개발 계정을 사용합니다.');
+	return new Map([
+		['admin', 'admin123'],
+		['user', 'user123']
+	]);
+}
+
+const accounts = loadAccounts();
 
 // CORS 설정
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -197,7 +261,6 @@ export const commandHandler = new SocketCommandHandler();
  * 인증 핸들러 (AccountManager.OnAuthRequestMessage 참고)
  */
 function handleAuth(socket: Socket, args: unknown): void {
-	const authPacket = args as AuthPacket;
 	const client = connectedClients.get(socket.id);
 
 	if (!client) {
@@ -208,7 +271,7 @@ function handleAuth(socket: Socket, args: unknown): void {
 		return;
 	}
 
-	if (!authPacket || !authPacket.username || !authPacket.password) {
+	if (!isAuthPacket(args)) {
 		socket.emit('auth:response', {
 			code: 400,
 			message: 'Invalid credentials format'
@@ -216,21 +279,21 @@ function handleAuth(socket: Socket, args: unknown): void {
 		return;
 	}
 
-	const storedPassword = accounts.get(authPacket.username);
-	if (storedPassword && storedPassword === authPacket.password) {
+	const storedPassword = accounts.get(args.username);
+	if (storedPassword && storedPassword === args.password) {
 		client.authenticated = true;
-		client.username = authPacket.username;
+		client.username = args.username;
 		socket.emit('auth:response', {
 			code: 100,
 			message: 'Success'
 		} as AuthResponseMessage);
-		console.log(`[Auth] 인증 성공: ${authPacket.username}`);
+		console.log(`[Auth] 인증 성공: ${args.username}`);
 	} else {
 		socket.emit('auth:response', {
 			code: 200,
 			message: 'Invalid Credentials'
 		} as AuthResponseMessage);
-		console.log(`[Auth] 인증 실패: ${authPacket.username}`);
+		console.log(`[Auth] 인증 실패: ${args.username}`);
 	}
 }
 
@@ -238,13 +301,20 @@ function handleAuth(socket: Socket, args: unknown): void {
  * 이동 핸들러 (MovePacket 처리)
  */
 function handleMove(socket: Socket, args: unknown): void {
-	const movePacket = args as MovePacket;
 	const client = connectedClients.get(socket.id);
 
 	if (!client?.authenticated) {
 		socket.emit('command:response', {
 			code: 401,
 			message: 'Authentication required'
+		} as CommandResponse);
+		return;
+	}
+
+	if (!isMovePacket(args)) {
+		socket.emit('command:response', {
+			code: 400,
+			message: 'Invalid move packet format'
 		} as CommandResponse);
 		return;
 	}
@@ -253,14 +323,14 @@ function handleMove(socket: Socket, args: unknown): void {
 	socket.broadcast.emit('player:move', {
 		playerId: socket.id,
 		username: client.username,
-		direction: movePacket.direction,
-		canceled: movePacket.canceled
+		direction: args.direction,
+		canceled: args.canceled
 	});
 
 	socket.emit('command:response', {
 		code: 100,
 		message: 'Move processed',
-		data: movePacket
+		data: args
 	} as CommandResponse);
 }
 
@@ -268,7 +338,6 @@ function handleMove(socket: Socket, args: unknown): void {
  * 총알 핸들러 (BulletPacket 처리)
  */
 function handleBullet(socket: Socket, args: unknown): void {
-	const bulletPacket = args as BulletPacket;
 	const client = connectedClients.get(socket.id);
 
 	if (!client?.authenticated) {
@@ -279,17 +348,29 @@ function handleBullet(socket: Socket, args: unknown): void {
 		return;
 	}
 
+	if (!isBulletPacket(args)) {
+		socket.emit('command:response', {
+			code: 400,
+			message: 'Invalid bullet packet format'
+		} as CommandResponse);
+		return;
+	}
+
 	// 다른 클라이언트들에게 총알 정보 브로드캐스트
 	socket.broadcast.emit('bullet:spawn', {
 		shooterId: socket.id,
 		username: client.username,
-		...bulletPacket
+		typeName: args.typeName,
+		teamName: args.teamName,
+		startPos: args.startPos,
+		targetPos: args.targetPos,
+		damage: args.damage
 	});
 
 	socket.emit('command:response', {
 		code: 100,
 		message: 'Bullet spawned',
-		data: bulletPacket
+		data: args
 	} as CommandResponse);
 }
 
