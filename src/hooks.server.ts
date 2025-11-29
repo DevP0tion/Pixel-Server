@@ -23,16 +23,43 @@ interface ConnectedClient {
 	connectedAt: Date;
 }
 
-// Event emitter for command handling
+/**
+ * Event emitter for custom command handlers.
+ *
+ * Custom handlers can be registered to handle commands not built-in to the server.
+ * The event name is the command type, and the callback receives (socket, data).
+ *
+ * Custom handlers should emit their own response via socket.emit('command:response', response).
+ *
+ * @example
+ * ```typescript
+ * import { commandEmitter } from './hooks.server';
+ *
+ * commandEmitter.on('myCustomCommand', (socket, data) => {
+ *   // Handle the command
+ *   socket.emit('command:response', {
+ *     success: true,
+ *     type: 'myCustomCommand',
+ *     data: { result: 'processed' }
+ *   });
+ * });
+ * ```
+ */
 export const commandEmitter = new EventEmitter();
 
 // Map to store connected clients
 const connectedClients: Map<string, ConnectedClient> = new Map();
 
+// CORS origins configuration - defaults to allowing all origins for development
+// In production, set ALLOWED_ORIGINS environment variable to comma-separated list of origins
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+	? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
+	: '*';
+
 // Create Socket.IO server instance
 export const io = new Server({
 	cors: {
-		origin: '*',
+		origin: allowedOrigins,
 		methods: ['GET', 'POST']
 	}
 });
@@ -101,14 +128,25 @@ function handleCommand(socket: Socket, command: Command): CommandResponse {
 				error: 'Invalid message format'
 			};
 
-		default:
-			// Emit event for custom command handlers
-			commandEmitter.emit(type, socket, data);
+		default: {
+			// Check if there are custom handlers registered for this command type
+			const hasCustomHandler = commandEmitter.listenerCount(type) > 0;
+			if (hasCustomHandler) {
+				// Emit event for custom command handlers
+				// Custom handlers are responsible for sending their own response via socket.emit
+				commandEmitter.emit(type, socket, data);
+				return {
+					success: true,
+					type: type,
+					data: { handledByCustomHandler: true }
+				};
+			}
 			return {
 				success: false,
 				type: 'unknown',
 				error: `Unknown command type: ${type}`
 			};
+		}
 	}
 }
 
