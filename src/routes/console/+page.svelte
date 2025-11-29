@@ -17,6 +17,7 @@
 	let commandInput = $state('');
 	let socket: Socket | null = $state(null);
 	let isConnected = $state(false);
+	let isUnityConnected = $state(false);
 	let logIdCounter = $state(0);
 	let logContainer: HTMLDivElement | null = $state(null);
 	let autoScroll = $state(true);
@@ -111,8 +112,12 @@
 
 		addLog('web', 'Socket.IO 서버에 연결 중...');
 
+		// 웹 콘솔로 연결 (clientType=web)
 		socket = io('http://localhost:7777', {
-			transports: ['websocket', 'polling']
+			transports: ['websocket', 'polling'],
+			query: {
+				clientType: 'web'
+			}
 		});
 
 		// 연결 이벤트
@@ -124,6 +129,7 @@
 		// 연결 해제 이벤트
 		socket.on('disconnect', (reason) => {
 			isConnected = false;
+			isUnityConnected = false;
 			addLog('socketio', `연결 해제: ${reason}`);
 		});
 
@@ -136,15 +142,58 @@
 		socket.on('welcome', (data) => {
 			addLog('socketio', `서버 메시지: ${data.message}`);
 			addLog('socketio', `클라이언트 ID: ${data.clientId}`);
+			addLog('socketio', `클라이언트 타입: ${data.clientType}`);
+			isUnityConnected = data.unityConnected || false;
+			if (data.unityConnected) {
+				addLog('game', 'Unity 서버가 이미 연결되어 있습니다.');
+			} else {
+				addLog('game', 'Unity 서버가 연결되어 있지 않습니다.');
+			}
 		});
 
-		// 명령어 응답
+		// Unity 서버 연결 알림
+		socket.on('unity:connected', (data) => {
+			isUnityConnected = true;
+			addLog('game', `✓ ${data.message}`);
+		});
+
+		// Unity 서버 연결 해제 알림
+		socket.on('unity:disconnected', (data) => {
+			isUnityConnected = false;
+			addLog('game', `✗ ${data.message}`);
+		});
+
+		// 명령어 전달 완료 응답
+		socket.on('command:relayed', (response) => {
+			addLog('socketio', `→ Unity: ${response.message}`);
+		});
+
+		// 명령어 응답 (로컬 처리)
 		socket.on('command:response', (response) => {
 			const status = response.code === 100 ? '✓' : '✗';
 			addLog('socketio', `${status} ${response.message}`);
 			if (response.data) {
 				addLog('socketio', `  데이터: ${JSON.stringify(response.data)}`);
 			}
+		});
+
+		// Unity 서버에서 온 게임 응답
+		socket.on('game:response', (response) => {
+			const status = response.code === 100 ? '✓' : '✗';
+			addLog('game', `${status} ${response.message}`);
+			if (response.data) {
+				addLog('game', `  데이터: ${JSON.stringify(response.data)}`);
+			}
+		});
+
+		// Unity 서버에서 온 게임 로그
+		socket.on('game:log', (data) => {
+			addLog('game', data.message || JSON.stringify(data));
+		});
+
+		// Unity 서버에서 온 게임 이벤트
+		socket.on('game:event', (data) => {
+			addLog('game', `이벤트: ${data.type || 'unknown'} - ${data.message || JSON.stringify(data)}`);
 		});
 
 		// 인증 응답
@@ -156,7 +205,9 @@
 		// 게임 이벤트: 플레이어 이동
 		socket.on('player:move', (data) => {
 			addLog('game', `플레이어 이동: ${data.username || data.playerId}`);
-			addLog('game', `  방향: (${data.direction.x}, ${data.direction.y})`);
+			if (data.direction) {
+				addLog('game', `  방향: (${data.direction.x}, ${data.direction.y})`);
+			}
 		});
 
 		// 게임 이벤트: 총알 생성
@@ -200,10 +251,8 @@
 
 	onMount(() => {
 		addLog('web', 'Pixel Server 콘솔이 시작되었습니다.');
-		addLog(
-			'web',
-			'도움말: ping, status, auth username=xxx password=xxx, move direction.x=1 direction.y=0 canceled=false'
-		);
+		addLog('web', '아키텍처: 웹 콘솔 → Svelte 서버 → Unity 서버');
+		addLog('web', '도움말: ping, status (로컬) | 기타 명령어는 Unity 서버로 전달됩니다.');
 		connectSocket();
 	});
 
@@ -224,10 +273,14 @@
 		<div class="header-left">
 			<h1>Pixel Server Console</h1>
 			<div class="connection-status">
-				<span class="status-indicator" class:connected={isConnected}></span>
-				<span class="status-text">
-					{isConnected ? '연결됨' : '연결 끊김'}
-				</span>
+				<div class="status-item">
+					<span class="status-indicator" class:connected={isConnected}></span>
+					<span class="status-text">Svelte: {isConnected ? '연결됨' : '연결 끊김'}</span>
+				</div>
+				<div class="status-item">
+					<span class="status-indicator" class:connected={isUnityConnected}></span>
+					<span class="status-text">Unity: {isUnityConnected ? '연결됨' : '연결 끊김'}</span>
+				</div>
 			</div>
 		</div>
 		<div class="header-right">
@@ -242,9 +295,9 @@
 
 	<!-- 범례 -->
 	<div class="legend">
-		<span class="legend-game">[Game] 유니티 게임 서버</span>
-		<span class="legend-socketio">[SocketIO] Socket.IO 서버</span>
-		<span class="legend-web">[Web] 웹 콘솔</span>
+		<span class="legend-game">[Game] Unity 서버 (게임)</span>
+		<span class="legend-socketio">[SocketIO] Svelte 서버 (중계)</span>
+		<span class="legend-web">[Web] 웹 콘솔 (입력)</span>
 	</div>
 
 	<!-- 로그 영역 -->
@@ -266,7 +319,7 @@
 				type="text"
 				bind:value={commandInput}
 				onkeydown={handleKeydown}
-				placeholder="명령어 입력... (예: ping, status, auth username=admin password=admin123)"
+				placeholder="명령어 입력... (Unity 서버로 전달됩니다)"
 				class="command-input"
 			/>
 			<button class="btn btn-success" onclick={sendCommand}>전송</button>
@@ -315,12 +368,18 @@
 	.connection-status {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 16px;
+	}
+
+	.status-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 	}
 
 	.status-indicator {
-		width: 12px;
-		height: 12px;
+		width: 10px;
+		height: 10px;
 		border-radius: 50%;
 		background-color: #e74c3c;
 	}
@@ -330,7 +389,7 @@
 	}
 
 	.status-text {
-		font-size: 0.875rem;
+		font-size: 0.75rem;
 		color: #a0a0a0;
 	}
 

@@ -6,6 +6,7 @@ export type {
 	AuthResponseMessage,
 	MovePacket,
 	BulletPacket,
+	ClientType,
 	ConnectedClient,
 	CommandHandler
 } from './types.js';

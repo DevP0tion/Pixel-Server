@@ -54,11 +54,19 @@ export interface BulletPacket {
 }
 
 /**
+ * 클라이언트 타입
+ * - unity: Unity 게임 서버 클라이언트
+ * - web: 웹 콘솔 클라이언트
+ */
+export type ClientType = 'unity' | 'web';
+
+/**
  * 연결된 클라이언트 정보
  */
 export interface ConnectedClient {
 	socket: Socket;
 	id: string;
+	clientType: ClientType;
 	authenticated: boolean;
 	username?: string;
 	connectedAt: Date;
