@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { resolveRoute } from '$app/paths';
+	import { resolve } from '$app/paths';
 
-	const consoleRoute = resolveRoute('/console', {});
-	const dashboardRoute = resolveRoute('/dashboard', {});
+	const consoleRoute = resolve('/console');
+	const dashboardRoute = resolve('/dashboard');
 </script>
 
 <svelte:head>
