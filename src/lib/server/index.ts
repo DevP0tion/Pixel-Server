@@ -11,9 +11,6 @@ export type {
 	CommandHandler
 } from './types.js';
 
-// Validators
-export { isAuthPacket, isMovePacket, isBulletPacket } from './validators.js';
-
 // Command Handler
 export { SocketCommandHandler } from './SocketCommandHandler.js';
 

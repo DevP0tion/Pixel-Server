@@ -1,21 +1,16 @@
 import type { SocketCommandHandler } from './SocketCommandHandler.js';
 import type { ConnectedClient } from './types.js';
-import { createAuthHandler, createStatusHandler, handlePing } from './handlers.js';
+import { createStatusHandler, handlePing } from './handlers.js';
 
 /**
  * 소켓 명령어 핸들러에 기본 명령어들을 등록합니다.
  * @param commandHandler 명령어 핸들러 인스턴스
  * @param connectedClients 연결된 클라이언트 맵
- * @param accounts 계정 정보 맵
  */
 export function loadCommands(
 	commandHandler: SocketCommandHandler,
 	connectedClients: Map<string, ConnectedClient>,
-	accounts: Map<string, string>
 ) {
-	// 인증 명령어
-	commandHandler.registerCommand('auth', createAuthHandler(connectedClients, accounts));
-
 	// 상태 조회 명령어
 	commandHandler.registerCommand('status', createStatusHandler(connectedClients));
 

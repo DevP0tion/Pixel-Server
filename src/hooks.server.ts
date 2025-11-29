@@ -61,7 +61,7 @@ export const io = new Server({
 export const commandHandler = new SocketCommandHandler();
 
 // 기본 명령어 등록 (commands.ts에서 로드)
-loadCommands(commandHandler, connectedClients, accounts);
+loadCommands(commandHandler, connectedClients);
 
 /**
  * Unity 서버로 명령어를 전달하는 함수

@@ -1,6 +1,5 @@
 import type { Socket } from 'socket.io';
 import type { AuthResponseMessage, CommandResponse, ConnectedClient } from './types.js';
-import { isAuthPacket, isMovePacket, isBulletPacket } from './validators.js';
 
 /**
  * 계정 정보 - 환경변수에서 로드하거나 기본값 사용 (개발용)
@@ -26,51 +25,6 @@ export function loadAccounts(): Map<string, string> {
 		['admin', 'admin123'],
 		['user', 'user123']
 	]);
-}
-
-/**
- * 인증 핸들러 팩토리 (AccountManager.OnAuthRequestMessage 참고)
- */
-export function createAuthHandler(
-	connectedClients: Map<string, ConnectedClient>,
-	accounts: Map<string, string>
-) {
-	return function handleAuth(socket: Socket, args: unknown): void {
-		const client = connectedClients.get(socket.id);
-
-		if (!client) {
-			socket.emit('auth:response', {
-				code: 500,
-				message: 'Client not found'
-			} as AuthResponseMessage);
-			return;
-		}
-
-		if (!isAuthPacket(args)) {
-			socket.emit('auth:response', {
-				code: 400,
-				message: 'Invalid credentials format'
-			} as AuthResponseMessage);
-			return;
-		}
-
-		const storedPassword = accounts.get(args.username);
-		if (storedPassword && storedPassword === args.password) {
-			client.authenticated = true;
-			client.username = args.username;
-			socket.emit('auth:response', {
-				code: 100,
-				message: 'Success'
-			} as AuthResponseMessage);
-			console.log(`[Auth] 인증 성공: ${args.username}`);
-		} else {
-			socket.emit('auth:response', {
-				code: 200,
-				message: 'Invalid Credentials'
-			} as AuthResponseMessage);
-			console.log(`[Auth] 인증 실패: ${args.username}`);
-		}
-	};
 }
 
 /**
