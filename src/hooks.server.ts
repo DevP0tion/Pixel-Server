@@ -4,13 +4,9 @@ import {
 	type ConnectedClient,
 	type ClientType,
 	SocketCommandHandler,
-	loadAccounts,
-	createAuthHandler,
-	createMoveHandler,
-	createBulletHandler,
-	createStatusHandler,
-	handlePing
+	loadAccounts
 } from '$lib/server/index.js';
+import { loadCommands } from '$lib/server/commands.js';
 
 // 연결된 클라이언트 맵
 const connectedClients: Map<string, ConnectedClient> = new Map();
@@ -64,12 +60,8 @@ export const io = new Server({
 // 명령어 핸들러 인스턴스
 export const commandHandler = new SocketCommandHandler();
 
-// 기본 명령어 등록
-commandHandler.registerCommand('auth', createAuthHandler(connectedClients, accounts));
-commandHandler.registerCommand('move', createMoveHandler(connectedClients));
-commandHandler.registerCommand('bullet', createBulletHandler(connectedClients));
-commandHandler.registerCommand('status', createStatusHandler(connectedClients));
-commandHandler.registerCommand('ping', handlePing);
+// 기본 명령어 등록 (commands.ts에서 로드)
+loadCommands(commandHandler, connectedClients, accounts);
 
 /**
  * Unity 서버로 명령어를 전달하는 함수
@@ -130,6 +122,15 @@ io.on('connection', (socket: Socket) => {
 		connectedAt: new Date()
 	});
 
+	// 클라이언트 타입에 따라 room에 join
+	if (clientType === 'unity') {
+		socket.join('game');
+		console.log(`[Room] Unity 서버가 'game' 채널에 참여했습니다: ${socket.id}`);
+	} else {
+		socket.join('web');
+		console.log(`[Room] 웹 콘솔이 'web' 채널에 참여했습니다: ${socket.id}`);
+	}
+
 	// Unity 서버인 경우 저장
 	if (clientType === 'unity') {
 		unityServers.set(socket.id, socket);
@@ -146,16 +147,6 @@ io.on('connection', (socket: Socket) => {
 		socket.on('command:response', (data) => {
 			console.log(`[Relay] Unity → 웹: command:response`);
 			relayResponseToWeb('game:response', data);
-		});
-
-		socket.on('player:move', (data) => {
-			console.log(`[Relay] Unity → 웹: player:move`);
-			relayResponseToWeb('player:move', data);
-		});
-
-		socket.on('bullet:spawn', (data) => {
-			console.log(`[Relay] Unity → 웹: bullet:spawn`);
-			relayResponseToWeb('bullet:spawn', data);
 		});
 
 		socket.on('player:leave', (data) => {
@@ -179,10 +170,10 @@ io.on('connection', (socket: Socket) => {
 		const client = connectedClients.get(socket.id);
 
 		if (client?.clientType === 'web') {
-			// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
-			// 먼저 로컬 명령어(ping, status 등) 처리 시도
-			if (['ping', 'status'].includes(data.cmd)) {
-				// 로컬에서 처리
+			// 웹 콘솔에서 온 명령어
+			// 로컬 명령어인지 확인 (commands.ts에 정의된 명령어)
+			if (isLocalCommand(data.cmd)) {
+				// 스벨트 서버에서 로컬로 처리
 				commandHandler.handleCommand(socket, data);
 			} else {
 				// Unity 서버로 전달

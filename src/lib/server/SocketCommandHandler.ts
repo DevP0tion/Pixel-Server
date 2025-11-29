@@ -11,7 +11,7 @@ export class SocketCommandHandler {
 	/**
 	 * 명령어 핸들러 딕셔너리입니다. 키는 명령어 문자열이며, 값은 인자를 받아 실행하는 함수입니다.
 	 */
-	private commandHandlers: Map<string, CommandHandler> = new Map();
+	public commandHandlers: Map<string, CommandHandler> = new Map();
 
 	/**
 	 * 새로운 명령어 핸들러를 등록합니다.

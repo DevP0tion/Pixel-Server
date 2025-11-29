@@ -18,11 +18,7 @@ export { isAuthPacket, isMovePacket, isBulletPacket } from './validators.js';
 export { SocketCommandHandler } from './SocketCommandHandler.js';
 
 // Handlers
-export {
-	loadAccounts,
-	createAuthHandler,
-	createMoveHandler,
-	createBulletHandler,
-	createStatusHandler,
-	handlePing
-} from './handlers.js';
+export { loadAccounts } from './handlers.js';
+
+// Commands
+export { loadCommands } from './commands.js';

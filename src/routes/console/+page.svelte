@@ -21,6 +21,12 @@
 	let logIdCounter = $state(0);
 	let logContainer: HTMLDivElement | null = $state(null);
 	let autoScroll = $state(true);
+	let commandTarget: 'unity' | 'svelte' | 'web' = $state('unity');
+	let selectedUnityServer = $state('all'); // 'all' 또는 특정 서버 ID
+	let connectedUnityServers: Array<{ id: string; name: string }> = $state([]);
+
+	// Unity 서버 목록 (derived state)
+	let unityServerOptions = $derived([{ id: 'all', name: '모든 서버' }, ...connectedUnityServers]);
 
 	// 로그 필터 토글 상태 (기본적으로 모두 활성화)
 	let filterGame = $state(true);
@@ -80,6 +86,14 @@
 		const input = commandInput.trim();
 		addLog('web', `> ${input}`);
 
+		// 대상에 따른 처리
+		if (commandTarget === 'web') {
+			// 웹 콘솔 명령어 (로컬 처리)
+			handleWebCommand(input);
+			commandInput = '';
+			return;
+		}
+
 		// 명령어 파싱
 		const parts = input.split(' ');
 		const cmd = parts[0];
@@ -109,14 +123,53 @@
 
 		// Socket.IO로 명령어 전송
 		if (socket && isConnected) {
-			socket.emit('command', { cmd, args });
-			addLog('socketio', `명령어 전송: ${cmd}`);
+			if (commandTarget === 'svelte') {
+				// Svelte 서버 명령어 (로컬 처리)
+				socket.emit('command', { cmd, args });
+				addLog('socketio', `Svelte 서버 명령어: ${cmd}`);
+			} else {
+				// Unity 서버 명령어 (전달)
+				const targetServer = selectedUnityServer === 'all' ? undefined : selectedUnityServer;
+				socket.emit('command', { cmd, args, targetServer });
+				const serverInfo =
+					selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer})`;
+				addLog('socketio', `${serverInfo}로 명령어 전송: ${cmd}`);
+			}
 		} else {
 			addLog('web', '소켓 연결이 없습니다. 연결을 시도합니다...');
 			connectSocket();
 		}
 
 		commandInput = '';
+	}
+
+	// 웹 콘솔 명령어 처리
+	function handleWebCommand(input: string) {
+		const parts = input.split(' ');
+		const cmd = parts[0].toLowerCase();
+
+		switch (cmd) {
+			case 'help':
+				addLog('web', '사용 가능한 웹 콘솔 명령어:');
+				addLog('web', '  help - 도움말 표시');
+				addLog('web', '  clear - 로그 지우기');
+				addLog('web', '  reconnect - 소켓 재연결');
+				addLog('web', '  status - 연결 상태 확인');
+				break;
+			case 'clear':
+				clearLogs();
+				break;
+			case 'reconnect':
+				connectSocket();
+				break;
+			case 'status':
+				addLog('web', `Svelte 서버: ${isConnected ? '연결됨' : '연결 끊김'}`);
+				addLog('web', `Unity 서버: ${isUnityConnected ? '연결됨' : '연결 끊김'}`);
+				addLog('web', `현재 대상: ${commandTarget}`);
+				break;
+			default:
+				addLog('web', `알 수 없는 명령어: ${cmd}. 'help'를 입력하여 도움말을 확인하세요.`);
+		}
 	}
 
 	// 소켓 연결
@@ -159,6 +212,7 @@
 			addLog('socketio', `클라이언트 ID: ${data.clientId}`);
 			addLog('socketio', `클라이언트 타입: ${data.clientType}`);
 			isUnityConnected = data.unityConnected || false;
+
 			if (data.unityConnected) {
 				addLog('game', 'Unity 서버가 이미 연결되어 있습니다.');
 			} else {
@@ -170,11 +224,30 @@
 		socket.on('unity:connected', (data) => {
 			isUnityConnected = true;
 			addLog('game', `✓ ${data.message}`);
+			// Unity 서버가 연결되면 목록에 추가
+			if (data.serverId && data.serverName) {
+				if (!connectedUnityServers.find((s) => s.id === data.serverId)) {
+					connectedUnityServers = [
+						...connectedUnityServers,
+						{ id: data.serverId, name: data.serverName }
+					];
+				}
+			}
 		});
 
 		// Unity 서버 연결 해제 알림
 		socket.on('unity:disconnected', (data) => {
-			isUnityConnected = false;
+			// 특정 서버가 연결 해제된 경우
+			if (data.serverId) {
+				connectedUnityServers = connectedUnityServers.filter((s) => s.id !== data.serverId);
+				if (selectedUnityServer === data.serverId) {
+					selectedUnityServer = 'all';
+				}
+			}
+			// 모든 Unity 서버가 연결 해제된 경우
+			if (connectedUnityServers.length === 0) {
+				isUnityConnected = false;
+			}
 			addLog('game', `✗ ${data.message}`);
 		});
 
@@ -267,7 +340,10 @@
 	onMount(() => {
 		addLog('web', 'Pixel Server 콘솔이 시작되었습니다.');
 		addLog('web', '아키텍처: 웹 콘솔 → Svelte 서버 → Unity 서버');
-		addLog('web', '도움말: ping, status (로컬) | 기타 명령어는 Unity 서버로 전달됩니다.');
+		addLog(
+			'web',
+			'도움말: 대상을 선택하고 명령어를 입력하세요. 웹 콘솔 명령어는 "help"를 입력하세요.'
+		);
 		connectSocket();
 	});
 
@@ -347,12 +423,30 @@
 	<!-- 명령어 입력 -->
 	<div class="input-container">
 		<div class="input-wrapper">
-			<span class="prompt">$</span>
+			<div class="target-selector">
+				<select bind:value={commandTarget} class="target-dropdown">
+					<option value="unity">Unity</option>
+					<option value="svelte">Svelte</option>
+					<option value="web">웹 콘솔</option>
+				</select>
+				{#if commandTarget === 'unity'}
+					<select bind:value={selectedUnityServer} class="unity-server-dropdown">
+						{#each unityServerOptions as server}
+							<option value={server.id}>{server.name}</option>
+						{/each}
+					</select>
+				{/if}
+				<span class="prompt">$</span>
+			</div>
 			<input
 				type="text"
 				bind:value={commandInput}
 				onkeydown={handleKeydown}
-				placeholder="명령어 입력... (Unity 서버로 전달됩니다)"
+				placeholder={commandTarget === 'web'
+					? '웹 콘솔 명령어 입력... (help, clear, status 등)'
+					: commandTarget === 'svelte'
+						? 'Svelte 서버 명령어 입력...'
+						: 'Unity 서버 명령어 입력...'}
 				class="command-input"
 			/>
 			<button class="btn btn-success" onclick={sendCommand}>전송</button>
@@ -599,6 +693,70 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+
+	.target-selector {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.target-dropdown {
+		padding: 6px 12px;
+		background-color: #0f3460;
+		border: 1px solid #2ecc71;
+		border-radius: 4px;
+		color: #2ecc71;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		font-size: 0.875rem;
+		font-weight: bold;
+		cursor: pointer;
+		outline: none;
+		transition: all 0.2s;
+	}
+
+	.target-dropdown:hover {
+		background-color: #16213e;
+		border-color: #27ae60;
+	}
+
+	.target-dropdown:focus {
+		border-color: #3498db;
+		box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+	}
+
+	.target-dropdown option {
+		background-color: #16213e;
+		color: #ffffff;
+	}
+
+	.unity-server-dropdown {
+		padding: 6px 12px;
+		background-color: #0f3460;
+		border: 1px solid #9b59b6;
+		border-radius: 4px;
+		color: #9b59b6;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		font-size: 0.875rem;
+		font-weight: bold;
+		cursor: pointer;
+		outline: none;
+		transition: all 0.2s;
+	}
+
+	.unity-server-dropdown:hover {
+		background-color: #16213e;
+		border-color: #8e44ad;
+	}
+
+	.unity-server-dropdown:focus {
+		border-color: #3498db;
+		box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+	}
+
+	.unity-server-dropdown option {
+		background-color: #16213e;
+		color: #ffffff;
 	}
 
 	.prompt {
