@@ -22,6 +22,21 @@
 	let logContainer: HTMLDivElement | null = $state(null);
 	let autoScroll = $state(true);
 
+	// 로그 필터 토글 상태 (기본적으로 모두 활성화)
+	let filterGame = $state(true);
+	let filterSocketio = $state(true);
+	let filterWeb = $state(true);
+
+	// 필터링된 로그 (derived state)
+	let filteredLogs = $derived(
+		logs.filter((log) => {
+			if (log.type === 'game' && !filterGame) return false;
+			if (log.type === 'socketio' && !filterSocketio) return false;
+			if (log.type === 'web' && !filterWeb) return false;
+			return true;
+		})
+	);
+
 	// 로그 추가 함수
 	function addLog(type: LogType, message: string) {
 		logs = [
@@ -293,16 +308,34 @@
 		</div>
 	</header>
 
-	<!-- 범례 -->
+	<!-- 범례 (토글 버튼) -->
 	<div class="legend">
-		<span class="legend-game">[Game] Unity 서버 (게임)</span>
-		<span class="legend-socketio">[SocketIO] Svelte 서버 (중계)</span>
-		<span class="legend-web">[Web] 웹 콘솔 (입력)</span>
+		<button
+			class="toggle-btn toggle-game"
+			class:active={filterGame}
+			onclick={() => (filterGame = !filterGame)}
+		>
+			[Game] Unity 서버 (게임)
+		</button>
+		<button
+			class="toggle-btn toggle-socketio"
+			class:active={filterSocketio}
+			onclick={() => (filterSocketio = !filterSocketio)}
+		>
+			[SocketIO] Svelte 서버 (중계)
+		</button>
+		<button
+			class="toggle-btn toggle-web"
+			class:active={filterWeb}
+			onclick={() => (filterWeb = !filterWeb)}
+		>
+			[Web] 웹 콘솔 (입력)
+		</button>
 	</div>
 
 	<!-- 로그 영역 -->
 	<div bind:this={logContainer} class="log-container">
-		{#each logs as log (log.id)}
+		{#each filteredLogs as log (log.id)}
 			<div class="log-entry">
 				<span class="log-time">{formatTime(log.timestamp)}</span>
 				<span class="log-prefix log-{log.type}">{getLogPrefix(log.type)}</span>
@@ -445,26 +478,69 @@
 		background-color: #219a52;
 	}
 
-	/* 범례 */
+	/* 범례 (토글 버튼) */
 	.legend {
 		display: flex;
-		gap: 24px;
+		gap: 12px;
 		padding: 8px 16px;
 		background-color: #16213e;
 		border-bottom: 1px solid #0f3460;
 		font-size: 0.875rem;
 	}
 
-	.legend-game {
+	.toggle-btn {
+		padding: 6px 12px;
+		border: 2px solid;
+		border-radius: 4px;
+		font-size: 0.875rem;
+		cursor: pointer;
+		transition:
+			background-color 0.2s,
+			opacity 0.2s;
+		background-color: transparent;
+	}
+
+	.toggle-game {
 		color: #2ecc71;
+		border-color: #2ecc71;
 	}
 
-	.legend-socketio {
+	.toggle-game.active {
+		background-color: rgba(46, 204, 113, 0.2);
+	}
+
+	.toggle-game:not(.active) {
+		opacity: 0.4;
+	}
+
+	.toggle-socketio {
 		color: #3498db;
+		border-color: #3498db;
 	}
 
-	.legend-web {
+	.toggle-socketio.active {
+		background-color: rgba(52, 152, 219, 0.2);
+	}
+
+	.toggle-socketio:not(.active) {
+		opacity: 0.4;
+	}
+
+	.toggle-web {
 		color: #f1c40f;
+		border-color: #f1c40f;
+	}
+
+	.toggle-web.active {
+		background-color: rgba(241, 196, 15, 0.2);
+	}
+
+	.toggle-web:not(.active) {
+		opacity: 0.4;
+	}
+
+	.toggle-btn:hover {
+		filter: brightness(1.2);
 	}
 
 	/* 로그 영역 */
