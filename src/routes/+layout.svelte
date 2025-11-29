@@ -32,15 +32,21 @@
 			</button>
 		</div>
 		<nav class="drawer-nav">
+			<!-- eslint-disable svelte/no-navigation-without-resolve -->
 			{#each navItems as item (item.path)}
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- href is pre-resolved with resolveRoute -->
-				<a href={item.href} class="nav-item" class:active={$page.url.pathname === item.path}>
+				<a
+					href={item.href}
+					class="nav-item"
+					class:active={$page.url.pathname === item.path}
+					title={item.label}
+				>
 					<span class="nav-icon">{item.icon}</span>
 					{#if isDrawerOpen}
 						<span class="nav-label">{item.label}</span>
 					{/if}
 				</a>
 			{/each}
+			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</nav>
 	</aside>
 
