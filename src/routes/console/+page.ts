@@ -1,5 +1,5 @@
-import io from 'socket.io-client'
+import io from 'socket.io-client';
 
 export async function load() {
-  io('http://localhost:7777', { auth: {}} );
+	io('http://localhost:7777', { auth: {} });
 }
