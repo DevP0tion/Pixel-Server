@@ -15,8 +15,35 @@ import {
 // 연결된 클라이언트 맵
 const connectedClients: Map<string, ConnectedClient> = new Map();
 
-// Unity 서버 클라이언트 (현재 연결된 Unity 서버)
-let unityServerSocket: Socket | null = null;
+// Unity 서버 클라이언트들 (여러 Unity 서버 지원)
+const unityServers: Map<string, Socket> = new Map();
+
+// Unity 서버 정보를 웹 클라이언트에게 전송하기 위한 인터페이스
+interface UnityServerInfo {
+	id: string;
+	connectedAt: string;
+}
+
+// 현재 연결된 Unity 서버 목록 가져오기
+function getUnityServerList(): UnityServerInfo[] {
+	const list: UnityServerInfo[] = [];
+	unityServers.forEach((socket, id) => {
+		const client = connectedClients.get(id);
+		if (client) {
+			list.push({
+				id,
+				connectedAt: client.connectedAt.toISOString()
+			});
+		}
+	});
+	return list;
+}
+
+// 하위 호환성을 위한 getter (첫 번째 Unity 서버 반환)
+function getUnityServerSocket(): Socket | null {
+	if (unityServers.size === 0) return null;
+	return unityServers.values().next().value ?? null;
+}
 
 // 계정 정보 로드
 const accounts = loadAccounts();
@@ -50,9 +77,10 @@ commandHandler.registerCommand('ping', handlePing);
  * @param data 명령어 데이터
  */
 function relayCommandToUnity(webSocket: Socket, data: CommandData) {
-	if (unityServerSocket && unityServerSocket.connected) {
+	const unitySocket = getUnityServerSocket();
+	if (unitySocket && unitySocket.connected) {
 		// Unity 서버로 명령어 전달
-		unityServerSocket.emit('command', data);
+		unitySocket.emit('command', data);
 
 		// 웹 콘솔에 전달 완료 알림
 		webSocket.emit('command:relayed', {
@@ -104,13 +132,14 @@ io.on('connection', (socket: Socket) => {
 
 	// Unity 서버인 경우 저장
 	if (clientType === 'unity') {
-		unityServerSocket = socket;
-		console.log('[Unity] Unity 서버가 연결되었습니다.');
+		unityServers.set(socket.id, socket);
+		console.log(`[Unity] Unity 서버가 연결되었습니다. (총 ${unityServers.size}개)`);
 
 		// 모든 웹 콘솔에 Unity 서버 연결 알림
 		relayResponseToWeb('unity:connected', {
 			message: 'Unity 서버가 연결되었습니다.',
-			unitySocketId: socket.id
+			unitySocketId: socket.id,
+			unityServers: getUnityServerList()
 		});
 
 		// Unity 서버에서 오는 이벤트들을 웹 콘솔로 전달
@@ -165,6 +194,42 @@ io.on('connection', (socket: Socket) => {
 		}
 	});
 
+	// Unity 서버 목록 요청 핸들러
+	socket.on('unity:list', () => {
+		socket.emit('unity:list', {
+			unityServers: getUnityServerList()
+		});
+	});
+
+	// Unity 서버 강제 연결 해제 요청 핸들러
+	socket.on('unity:disconnect', (data: { unitySocketId: string }) => {
+		const client = connectedClients.get(socket.id);
+
+		// 웹 클라이언트만 Unity 서버 연결 해제 가능
+		if (client?.clientType !== 'web') {
+			socket.emit('unity:disconnect:response', {
+				code: 403,
+				message: '권한이 없습니다.'
+			});
+			return;
+		}
+
+		const unitySocket = unityServers.get(data.unitySocketId);
+		if (unitySocket) {
+			console.log(`[Unity] Unity 서버 강제 연결 해제: ${data.unitySocketId}`);
+			unitySocket.disconnect(true);
+			socket.emit('unity:disconnect:response', {
+				code: 100,
+				message: `Unity 서버 연결 해제됨: ${data.unitySocketId}`
+			});
+		} else {
+			socket.emit('unity:disconnect:response', {
+				code: 404,
+				message: `Unity 서버를 찾을 수 없습니다: ${data.unitySocketId}`
+			});
+		}
+	});
+
 	// 연결 해제 핸들러
 	socket.on('disconnect', () => {
 		const client = connectedClients.get(socket.id);
@@ -173,13 +238,15 @@ io.on('connection', (socket: Socket) => {
 		);
 
 		// Unity 서버가 연결 해제된 경우
-		if (client?.clientType === 'unity' && unityServerSocket?.id === socket.id) {
-			unityServerSocket = null;
-			console.log('[Unity] Unity 서버 연결이 해제되었습니다.');
+		if (client?.clientType === 'unity' && unityServers.has(socket.id)) {
+			unityServers.delete(socket.id);
+			console.log(`[Unity] Unity 서버 연결이 해제되었습니다. (남은 서버: ${unityServers.size}개)`);
 
 			// 모든 웹 콘솔에 Unity 서버 연결 해제 알림
 			relayResponseToWeb('unity:disconnected', {
-				message: 'Unity 서버 연결이 해제되었습니다.'
+				message: 'Unity 서버 연결이 해제되었습니다.',
+				unitySocketId: socket.id,
+				unityServers: getUnityServerList()
 			});
 		}
 
@@ -198,7 +265,8 @@ io.on('connection', (socket: Socket) => {
 		message: 'Pixel Server에 연결되었습니다',
 		clientId: socket.id,
 		clientType,
-		unityConnected: unityServerSocket !== null && unityServerSocket.connected,
+		unityConnected: unityServers.size > 0,
+		unityServers: getUnityServerList(),
 		serverTime: new Date().toISOString()
 	});
 });
