@@ -165,21 +165,23 @@ io.on('connection', (socket: Socket) => {
 		});
 	}
 
-	// 명령어 이벤트 핸들러
-	socket.on('command', (data: CommandData) => {
+	// Svelte 서버 명령어 이벤트 핸들러
+	socket.on('svelte:command', (data: CommandData) => {
+		console.log(`[Command] svelte:command 수신: ${data.cmd}`);
+		// 스벨트 서버에서 로컬로 처리
+		commandHandler.handleCommand(socket, data);
+	});
+
+	// Unity 서버 명령어 이벤트 핸들러
+	socket.on('unity:command', (data: CommandData) => {
 		const client = connectedClients.get(socket.id);
 
 		if (client?.clientType === 'web') {
-			// 웹 콘솔에서 온 명령어
-			// 로컬 명령어인지 확인 (commands.ts에 정의된 명령어)
-			if (isLocalCommand(data.cmd)) {
-				// 스벨트 서버에서 로컬로 처리
-				commandHandler.handleCommand(socket, data);
-			} else {
-				// Unity 서버로 전달
-				relayCommandToUnity(socket, data);
-			}
+			console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
+			// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
+			relayCommandToUnity(socket, data);
 		} else if (client?.clientType === 'unity') {
+			console.log(`[Command] unity:command 수신 (Unity): ${data.cmd}`);
 			// Unity 서버에서 온 명령어 → 직접 처리
 			commandHandler.handleCommand(socket, data);
 		}

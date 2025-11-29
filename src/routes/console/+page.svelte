@@ -124,13 +124,13 @@
 		// Socket.IO로 명령어 전송
 		if (socket && isConnected) {
 			if (commandTarget === 'svelte') {
-				// Svelte 서버 명령어 (로컬 처리)
-				socket.emit('command', { cmd, args });
+				// Svelte 서버 명령어 (svelte:command 이벤트로 전송)
+				socket.emit('svelte:command', { cmd, args });
 				addLog('socketio', `Svelte 서버 명령어: ${cmd}`);
 			} else {
-				// Unity 서버 명령어 (전달)
+				// Unity 서버 명령어 (unity:command 이벤트로 전송)
 				const targetServer = selectedUnityServer === 'all' ? undefined : selectedUnityServer;
-				socket.emit('command', { cmd, args, targetServer });
+				socket.emit('unity:command', { cmd, args, targetServer });
 				const serverInfo =
 					selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer})`;
 				addLog('socketio', `${serverInfo}로 명령어 전송: ${cmd}`);
