@@ -72,7 +72,7 @@ function relayCommandToUnity(webSocket: Socket, data: CommandData) {
 	const unitySocket = getUnityServerSocket();
 	if (unitySocket && unitySocket.connected) {
 		// Unity 서버로 명령어 전달
-		unitySocket.emit('command', data);
+		unitySocket.emit('unity:command', data);
 
 		// 웹 콘솔에 전달 완료 알림
 		webSocket.emit('command:relayed', {
