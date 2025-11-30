@@ -1,23 +1,13 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { socketManager } from '$lib/socket';
+	import { logStore, type LogType, type LogEntry } from '$lib/logStore';
 
-	// 로그 타입 정의
-	type LogType = 'game' | 'socketio' | 'web';
-
-	interface LogEntry {
-		id: number;
-		type: LogType;
-		message: string;
-		timestamp: Date;
-	}
-
-	// 상태
-	let logs: LogEntry[] = $state([]);
+	// 상태 (로그는 logStore에서 관리)
+	let logs: LogEntry[] = $state(logStore.logs);
 	let commandInput = $state('');
 	let isConnected = $state(false);
 	let isUnityConnected = $state(false);
-	let logIdCounter = $state(0);
 	let logContainer: HTMLDivElement | null = $state(null);
 	let autoScroll = $state(true);
 	let commandTarget: 'unity' | 'svelte' | 'web' = $state('unity');
@@ -47,15 +37,7 @@
 
 	// 로그 추가 함수
 	function addLog(type: LogType, message: string) {
-		logs = [
-			...logs,
-			{
-				id: logIdCounter++,
-				type,
-				message,
-				timestamp: new Date()
-			}
-		];
+		logStore.addLog(type, message);
 
 		// 자동 스크롤
 		if (autoScroll && logContainer) {
@@ -312,7 +294,7 @@
 
 	// 로그 지우기
 	function clearLogs() {
-		logs = [];
+		logStore.clearLogs();
 		addLog('web', '로그가 지워졌습니다.');
 	}
 
@@ -333,19 +315,36 @@
 	}
 
 	onMount(() => {
-		addLog('web', 'Pixel Server 콘솔이 시작되었습니다.');
-		addLog('web', '아키텍처: 웹 콘솔 → Svelte 서버 → Unity 서버');
-		addLog(
-			'web',
-			'도움말: 대상을 선택하고 명령어를 입력하세요. 웹 콘솔 명령어는 "help"를 입력하세요.'
-		);
+		// logStore 이벤트 핸들러 등록
+		const handleLogAdded = () => {
+			logs = logStore.logs;
+		};
+		const handleLogsCleared = () => {
+			logs = logStore.logs;
+		};
+		logStore.on('logAdded', handleLogAdded);
+		logStore.on('logsCleared', handleLogsCleared);
+		eventCleanupFns.push(() => {
+			logStore.off('logAdded', handleLogAdded);
+			logStore.off('logsCleared', handleLogsCleared);
+		});
+
+		// 기존 로그가 없는 경우에만 시작 메시지 추가
+		if (logStore.logs.length === 0) {
+			addLog('web', 'Pixel Server 콘솔이 시작되었습니다.');
+			addLog('web', '아키텍처: 웹 콘솔 → Svelte 서버 → Unity 서버');
+			addLog(
+				'web',
+				'도움말: 대상을 선택하고 명령어를 입력하세요. 웹 콘솔 명령어는 "help"를 입력하세요.'
+			);
+		}
 
 		// 현재 연결 상태 동기화
 		isConnected = socketManager.isConnected;
 		isUnityConnected = socketManager.isUnityConnected;
 
-		// 이미 연결되어 있는 경우 메시지 표시
-		if (isConnected) {
+		// 이미 연결되어 있는 경우 메시지 표시 (기존 로그가 없을 때만)
+		if (isConnected && logStore.logs.length <= 3) {
 			addLog('socketio', `이미 연결됨 (ID: ${socketManager.clientId})`);
 		}
 
