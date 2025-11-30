@@ -20,7 +20,8 @@ export function loadCommands(
 
 	// 도움말 명령어
 	commandHandler.registerCommand('help', (socket) => {
-		const lines: string[] = ['사용 가능한 명령어:'];
+		const helpHeader = translate('help_header', '사용 가능한 명령어:');
+		const lines: string[] = [helpHeader];
 
 		for (const cmd of commandHandler.commandHandlers.keys()) {
 			const description = translate(`${cmd}`, 'No description available.');

@@ -270,14 +270,9 @@
 			const res = response as { code: number; message: string; data?: unknown };
 			const status = res.code === 100 ? '' : '✗';
 			// 메시지에 \n이 포함된 경우 여러 줄로 출력
-			const lines = res.message.split('\n');
-			lines.forEach((line, index) => {
-				if (index === 0) {
-					addLog('socketio', `${status} ${line}`);
-				} else {
-					addLog('socketio', line);
-				}
-			});
+			const [firstLine, ...otherLines] = res.message.split('\n');
+			addLog('socketio', `${status} ${firstLine}`);
+			otherLines.forEach((line) => addLog('socketio', line));
 			if (res.data) {
 				addLog('socketio', `  데이터: ${JSON.stringify(res.data)}`);
 			}
