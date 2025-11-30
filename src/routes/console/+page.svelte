@@ -104,51 +104,53 @@
 		});
 
 		// 연결 오류 이벤트
-		addEventHandler('connect_error', (error: unknown) => {
-			const err = error as Error;
-			addLog('socketio', `연결 오류: ${err.message}`);
+		addEventHandler('connect_error', (error: Error) => {
+			addLog('socketio', `연결 오류: ${error.message}`);
 		});
 
 		// 환영 메시지
-		addEventHandler('welcome', (data: unknown) => {
-			const welcomeData = data as {
+		addEventHandler(
+			'welcome',
+			(data: {
 				message: string;
 				clientId: string;
 				clientType: string;
 				unityConnected: boolean;
 				unityServers?: Array<{ id: string; connectedAt: string }>;
-			};
-			addLog('socketio', `서버 메시지: ${welcomeData.message}`);
-			addLog('socketio', `클라이언트 ID: ${welcomeData.clientId}`);
-			addLog('socketio', `클라이언트 타입: ${welcomeData.clientType}`);
-			isUnityConnected = welcomeData.unityConnected || false;
+			}) => {
+				addLog('socketio', `서버 메시지: ${data.message}`);
+				addLog('socketio', `클라이언트 ID: ${data.clientId}`);
+				addLog('socketio', `클라이언트 타입: ${data.clientType}`);
+				isUnityConnected = data.unityConnected || false;
+				// Unity 서버 목록 초기화
+				if (data.unityServers) {
+					connectedUnityServers = formatUnityServerList(data.unityServers);
+				}
 
-			// Unity 서버 목록 초기화
-			if (welcomeData.unityServers) {
-				connectedUnityServers = formatUnityServerList(welcomeData.unityServers);
+				if (data.unityConnected) {
+					addLog('game', `Unity 서버가 ${connectedUnityServers.length}개 연결되어 있습니다.`);
+				} else {
+					addLog('game', 'Unity 서버가 연결되어 있지 않습니다.');
+				}
 			}
-
-			if (welcomeData.unityConnected) {
-				addLog('game', `Unity 서버가 ${connectedUnityServers.length}개 연결되어 있습니다.`);
-			} else {
-				addLog('game', 'Unity 서버가 연결되어 있지 않습니다.');
-			}
-		});
+		);
 
 		// Unity 서버 연결 알림
-		addEventHandler('unity:connected', (data: unknown) => {
-			const unityData = data as {
+		addEventHandler(
+			'unity:connected',
+			(data: {
 				message: string;
 				unitySocketId?: string;
 				unityServers?: Array<{ id: string; connectedAt: string }>;
-			};
-			isUnityConnected = true;
-			addLog('game', `✓ ${unityData.message}`);
-			// Unity 서버 목록 업데이트
-			if (unityData.unityServers) {
-				connectedUnityServers = formatUnityServerList(unityData.unityServers);
+			}) => {
+				isUnityConnected = true;
+				addLog('game', `✓ ${data.message}`);
+				// Unity 서버 목록 업데이트
+				if (data.unityServers) {
+					connectedUnityServers = formatUnityServerList(data.unityServers);
+				}
 			}
-		});
+		);
 
 		// Unity 서버 연결 해제 알림
 		addEventHandler(
@@ -163,10 +165,7 @@
 					connectedUnityServers = formatUnityServerList(data.unityServers);
 				}
 				// 선택된 서버가 연결 해제된 경우 'all'로 변경
-				if (
-					data.unitySocketId &&
-					selectedUnityServer === data.unitySocketId
-				) {
+				if (data.unitySocketId && selectedUnityServer === data.unitySocketId) {
 					selectedUnityServer = 'all';
 				}
 				// 모든 Unity 서버가 연결 해제된 경우
@@ -176,53 +175,50 @@
 		);
 
 		// 명령어 전달 완료 응답
-		addEventHandler('command:relayed', (response: unknown) => {
-			const res = response as { message: string };
-			addLog('socketio', `→ Unity: ${res.message}`);
+		addEventHandler('command:relayed', (response: { message: string }) => {
+			addLog('socketio', `→ Unity: ${response.message}`);
 		});
 
 		// 명령어 응답 (로컬 처리)
-		addEventHandler('command:response', (response: unknown) => {
-			const res = response as { code: number; message: string; data?: unknown };
-			const status = res.code === 100 ? '' : '✗';
-			// 메시지에 \n이 포함된 경우 여러 줄로 출력
-			const [firstLine, ...otherLines] = res.message.split('\n');
-			addLog('socketio', `${status} ${firstLine}`);
-			otherLines.forEach((line) => addLog('socketio', line));
-			if (res.data) {
-				addLog('socketio', `  데이터: ${JSON.stringify(res.data)}`);
+		addEventHandler(
+			'command:response',
+			(response: { code: number; message: string; data?: unknown }) => {
+				const status = response.code === 100 ? '' : '✗';
+				// 메시지에 \n이 포함된 경우 여러 줄로 출력
+				const [firstLine, ...otherLines] = response.message.split('\n');
+				addLog('socketio', `${status} ${firstLine}`);
+				otherLines.forEach((line) => addLog('socketio', line));
+				if (response.data) {
+					addLog('socketio', `  데이터: ${JSON.stringify(response.data)}`);
+				}
 			}
-		});
+		);
 
 		// Unity 서버에서 온 게임 응답
-		addEventHandler('game:response', (response: unknown) => {
-			const res = response as { code: number; message: string; data?: unknown };
-			const status = res.code === 100 ? '✓' : '✗';
-			addLog('game', `${status} ${res.message}`);
-			if (res.data) {
-				addLog('game', `  데이터: ${JSON.stringify(res.data)}`);
+		addEventHandler(
+			'game:response',
+			(response: { code: number; message: string; data?: unknown }) => {
+				const status = response.code === 100 ? '✓' : '✗';
+				addLog('game', `${status} ${response.message}`);
+				if (response.data) {
+					addLog('game', `  데이터: ${JSON.stringify(response.data)}`);
+				}
 			}
-		});
+		);
 
 		// Unity 서버에서 온 게임 로그
-		addEventHandler('game:log', (data: unknown) => {
-			const logData = data as { message?: string };
-			addLog('game', logData.message || JSON.stringify(data));
+		addEventHandler('game:log', (data: { message?: string }) => {
+			addLog('game', data.message || JSON.stringify(data));
 		});
 
 		// Unity 서버에서 온 게임 이벤트
-		addEventHandler('game:event', (data: unknown) => {
-			const eventData = data as { type?: string; message?: string };
-			addLog(
-				'game',
-				`이벤트: ${eventData.type || 'unknown'} - ${eventData.message || JSON.stringify(data)}`
-			);
+		addEventHandler('game:event', (data: { type?: string; message?: string }) => {
+			addLog('game', `이벤트: ${data.type || 'unknown'} - ${data.message || JSON.stringify(data)}`);
 		});
 
 		// 브로드캐스트 메시지
-		addEventHandler('broadcast', (data: unknown) => {
-			const broadcastData = data as { message: string; from: string };
-			addLog('game', `브로드캐스트: ${broadcastData.message} (from: ${broadcastData.from})`);
+		addEventHandler('broadcast', (data: { message: string; from: string }) => {
+			addLog('game', `브로드캐스트: ${data.message} (from: ${data.from})`);
 		});
 	}
 
