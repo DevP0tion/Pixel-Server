@@ -150,10 +150,12 @@ export function sendToServer(
 		addLog('socketio', `Svelte 서버 명령어: ${cmd}`);
 	} else {
 		// Unity 서버 명령어 (unity:command 이벤트로 전송)
-		const targetServer = selectedUnityServer === 'all' ? undefined : selectedUnityServer;
-		socketManager.sendSocketEvent('unity:command', { cmd, args, targetServer });
+		// targetUnityId를 args 안에 포함시켜서 전송
+		const commandArgs =
+			selectedUnityServer === 'all' ? args : { ...args, targetUnityId: selectedUnityServer };
+		socketManager.sendSocketEvent('unity:command', { cmd, args: commandArgs });
 		const serverInfo =
-			selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer})`;
+			selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer.substring(0, 8)}...)`;
 		addLog('socketio', `${serverInfo}로 명령어 전송: ${cmd}`);
 	}
 

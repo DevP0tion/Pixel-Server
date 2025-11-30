@@ -44,6 +44,18 @@
 		})
 	);
 
+	/**
+	 * 서버 목록을 클라이언트용 형식으로 변환
+	 */
+	function formatUnityServerList(
+		servers: Array<{ id: string; connectedAt: string }>
+	): Array<{ id: string; name: string }> {
+		return servers.map((s) => ({
+			id: s.id,
+			name: `서버 ${s.id.substring(0, 8)}...`
+		}));
+	}
+
 	// 명령어 전송
 	function sendCommand() {
 		if (!commandInput.trim()) return;
@@ -104,14 +116,20 @@
 				clientId: string;
 				clientType: string;
 				unityConnected: boolean;
+				unityServers?: Array<{ id: string; connectedAt: string }>;
 			};
 			addLog('socketio', `서버 메시지: ${welcomeData.message}`);
 			addLog('socketio', `클라이언트 ID: ${welcomeData.clientId}`);
 			addLog('socketio', `클라이언트 타입: ${welcomeData.clientType}`);
 			isUnityConnected = welcomeData.unityConnected || false;
 
+			// Unity 서버 목록 초기화
+			if (welcomeData.unityServers) {
+				connectedUnityServers = formatUnityServerList(welcomeData.unityServers);
+			}
+
 			if (welcomeData.unityConnected) {
-				addLog('game', 'Unity 서버가 이미 연결되어 있습니다.');
+				addLog('game', `Unity 서버가 ${connectedUnityServers.length}개 연결되어 있습니다.`);
 			} else {
 				addLog('game', 'Unity 서버가 연결되어 있지 않습니다.');
 			}
@@ -119,35 +137,43 @@
 
 		// Unity 서버 연결 알림
 		addEventHandler('unity:connected', (data: unknown) => {
-			const unityData = data as { message: string; serverId?: string; serverName?: string };
+			const unityData = data as {
+				message: string;
+				unitySocketId?: string;
+				unityServers?: Array<{ id: string; connectedAt: string }>;
+			};
 			isUnityConnected = true;
 			addLog('game', `✓ ${unityData.message}`);
-			// Unity 서버가 연결되면 목록에 추가
-			if (unityData.serverId && unityData.serverName) {
-				if (!connectedUnityServers.find((s) => s.id === unityData.serverId)) {
-					connectedUnityServers = [
-						...connectedUnityServers,
-						{ id: unityData.serverId, name: unityData.serverName }
-					];
-				}
+			// Unity 서버 목록 업데이트
+			if (unityData.unityServers) {
+				connectedUnityServers = formatUnityServerList(unityData.unityServers);
 			}
 		});
 
 		// Unity 서버 연결 해제 알림
-		addEventHandler('unity:disconnected', (data: { message: string; serverId?: string }) => {
-			// 특정 서버가 연결 해제된 경우
-			if (data.serverId) {
-				connectedUnityServers = connectedUnityServers.filter((s) => s.id !== data.serverId);
-				if (selectedUnityServer === data.serverId) {
+		addEventHandler(
+			'unity:disconnected',
+			(data: {
+				message: string;
+				unitySocketId?: string;
+				unityServers?: Array<{ id: string; connectedAt: string }>;
+			}) => {
+				// Unity 서버 목록 업데이트
+				if (data.unityServers) {
+					connectedUnityServers = formatUnityServerList(data.unityServers);
+				}
+				// 선택된 서버가 연결 해제된 경우 'all'로 변경
+				if (
+					data.unitySocketId &&
+					selectedUnityServer === data.unitySocketId
+				) {
 					selectedUnityServer = 'all';
 				}
+				// 모든 Unity 서버가 연결 해제된 경우
+				isUnityConnected = connectedUnityServers.length > 0;
+				addLog('game', `✗ ${data.message}`);
 			}
-			// 모든 Unity 서버가 연결 해제된 경우
-			if (connectedUnityServers.length === 0) {
-				isUnityConnected = false;
-			}
-			addLog('game', `✗ ${data.message}`);
-		});
+		);
 
 		// 명령어 전달 완료 응답
 		addEventHandler('command:relayed', (response: unknown) => {
