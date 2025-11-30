@@ -2,6 +2,8 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
 	import { resolveRoute } from '$app/paths';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	let { children } = $props();
 	let isDrawerOpen = $state(true);
@@ -16,6 +18,14 @@
 	function toggleDrawer() {
 		isDrawerOpen = !isDrawerOpen;
 	}
+
+	// 클라이언트 측에서만 소켓 매니저 초기화
+	onMount(async () => {
+		if (browser) {
+			const { socketManager } = await import('$lib/socket');
+			socketManager.connect();
+		}
+	});
 </script>
 
 <svelte:head>

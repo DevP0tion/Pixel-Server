@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { io, type Socket } from 'socket.io-client';
+	import { socketManager } from '$lib/socket';
 
 	// 로그 타입 정의
 	type LogType = 'game' | 'socketio' | 'web';
@@ -15,7 +15,6 @@
 	// 상태
 	let logs: LogEntry[] = $state([]);
 	let commandInput = $state('');
-	let socket: Socket | null = $state(null);
 	let isConnected = $state(false);
 	let isUnityConnected = $state(false);
 	let logIdCounter = $state(0);
@@ -24,6 +23,9 @@
 	let commandTarget: 'unity' | 'svelte' | 'web' = $state('unity');
 	let selectedUnityServer = $state('all'); // 'all' 또는 특정 서버 ID
 	let connectedUnityServers: Array<{ id: string; name: string }> = $state([]);
+
+	// 이벤트 리스너 정리를 위한 배열
+	let eventCleanupFns: Array<() => void> = [];
 
 	// Unity 서버 목록 (derived state)
 	let unityServerOptions = $derived([{ id: 'all', name: '모든 서버' }, ...connectedUnityServers]);
@@ -122,22 +124,22 @@
 		}
 
 		// Socket.IO로 명령어 전송
-		if (socket && isConnected) {
+		if (isConnected) {
 			if (commandTarget === 'svelte') {
 				// Svelte 서버 명령어 (svelte:command 이벤트로 전송)
-				socket.emit('svelte:command', { cmd, args });
+				socketManager.sendSocketEvent('svelte:command', { cmd, args });
 				addLog('socketio', `Svelte 서버 명령어: ${cmd}`);
 			} else {
 				// Unity 서버 명령어 (unity:command 이벤트로 전송)
 				const targetServer = selectedUnityServer === 'all' ? undefined : selectedUnityServer;
-				socket.emit('unity:command', { cmd, args, targetServer });
+				socketManager.sendSocketEvent('unity:command', { cmd, args, targetServer });
 				const serverInfo =
 					selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer})`;
 				addLog('socketio', `${serverInfo}로 명령어 전송: ${cmd}`);
 			}
 		} else {
 			addLog('web', '소켓 연결이 없습니다. 연결을 시도합니다...');
-			connectSocket();
+			reconnectSocket();
 		}
 
 		commandInput = '';
@@ -160,7 +162,7 @@
 				clearLogs();
 				break;
 			case 'reconnect':
-				connectSocket();
+				reconnectSocket();
 				break;
 			case 'status':
 				addLog('web', `Svelte 서버: ${isConnected ? '연결됨' : '연결 끊김'}`);
@@ -172,48 +174,53 @@
 		}
 	}
 
-	// 소켓 연결
-	function connectSocket() {
-		if (socket) {
-			socket.disconnect();
+	// 소켓 재연결
+	function reconnectSocket() {
+		addLog('web', 'Socket.IO 서버에 재연결 중...');
+		socketManager.reconnect();
+	}
+
+	// 소켓 이벤트 핸들러 등록
+	function setupSocketEventHandlers() {
+		// 이벤트 리스너 헬퍼 함수
+		function addEventHandler(event: string, handler: (...args: unknown[]) => void) {
+			socketManager.on(event, handler);
+			eventCleanupFns.push(() => socketManager.off(event, handler));
 		}
 
-		addLog('web', 'Socket.IO 서버에 연결 중...');
-
-		// 웹 콘솔로 연결 (clientType=web)
-		socket = io('http://localhost:7777', {
-			transports: ['websocket', 'polling'],
-			query: {
-				clientType: 'web'
-			}
-		});
-
 		// 연결 이벤트
-		socket.on('connect', () => {
+		addEventHandler('connect', () => {
 			isConnected = true;
-			addLog('socketio', `연결됨 (ID: ${socket?.id})`);
+			addLog('socketio', `연결됨 (ID: ${socketManager.clientId})`);
 		});
 
 		// 연결 해제 이벤트
-		socket.on('disconnect', (reason) => {
+		addEventHandler('disconnect', (reason: unknown) => {
 			isConnected = false;
 			isUnityConnected = false;
 			addLog('socketio', `연결 해제: ${reason}`);
 		});
 
 		// 연결 오류 이벤트
-		socket.on('connect_error', (error) => {
-			addLog('socketio', `연결 오류: ${error.message}`);
+		addEventHandler('connect_error', (error: unknown) => {
+			const err = error as Error;
+			addLog('socketio', `연결 오류: ${err.message}`);
 		});
 
 		// 환영 메시지
-		socket.on('welcome', (data) => {
-			addLog('socketio', `서버 메시지: ${data.message}`);
-			addLog('socketio', `클라이언트 ID: ${data.clientId}`);
-			addLog('socketio', `클라이언트 타입: ${data.clientType}`);
-			isUnityConnected = data.unityConnected || false;
+		addEventHandler('welcome', (data: unknown) => {
+			const welcomeData = data as {
+				message: string;
+				clientId: string;
+				clientType: string;
+				unityConnected: boolean;
+			};
+			addLog('socketio', `서버 메시지: ${welcomeData.message}`);
+			addLog('socketio', `클라이언트 ID: ${welcomeData.clientId}`);
+			addLog('socketio', `클라이언트 타입: ${welcomeData.clientType}`);
+			isUnityConnected = welcomeData.unityConnected || false;
 
-			if (data.unityConnected) {
+			if (welcomeData.unityConnected) {
 				addLog('game', 'Unity 서버가 이미 연결되어 있습니다.');
 			} else {
 				addLog('game', 'Unity 서버가 연결되어 있지 않습니다.');
@@ -221,26 +228,28 @@
 		});
 
 		// Unity 서버 연결 알림
-		socket.on('unity:connected', (data) => {
+		addEventHandler('unity:connected', (data: unknown) => {
+			const unityData = data as { message: string; serverId?: string; serverName?: string };
 			isUnityConnected = true;
-			addLog('game', `✓ ${data.message}`);
+			addLog('game', `✓ ${unityData.message}`);
 			// Unity 서버가 연결되면 목록에 추가
-			if (data.serverId && data.serverName) {
-				if (!connectedUnityServers.find((s) => s.id === data.serverId)) {
+			if (unityData.serverId && unityData.serverName) {
+				if (!connectedUnityServers.find((s) => s.id === unityData.serverId)) {
 					connectedUnityServers = [
 						...connectedUnityServers,
-						{ id: data.serverId, name: data.serverName }
+						{ id: unityData.serverId, name: unityData.serverName }
 					];
 				}
 			}
 		});
 
 		// Unity 서버 연결 해제 알림
-		socket.on('unity:disconnected', (data) => {
+		addEventHandler('unity:disconnected', (data: unknown) => {
+			const unityData = data as { message: string; serverId?: string };
 			// 특정 서버가 연결 해제된 경우
-			if (data.serverId) {
-				connectedUnityServers = connectedUnityServers.filter((s) => s.id !== data.serverId);
-				if (selectedUnityServer === data.serverId) {
+			if (unityData.serverId) {
+				connectedUnityServers = connectedUnityServers.filter((s) => s.id !== unityData.serverId);
+				if (selectedUnityServer === unityData.serverId) {
 					selectedUnityServer = 'all';
 				}
 			}
@@ -248,70 +257,92 @@
 			if (connectedUnityServers.length === 0) {
 				isUnityConnected = false;
 			}
-			addLog('game', `✗ ${data.message}`);
+			addLog('game', `✗ ${unityData.message}`);
 		});
 
 		// 명령어 전달 완료 응답
-		socket.on('command:relayed', (response) => {
-			addLog('socketio', `→ Unity: ${response.message}`);
+		addEventHandler('command:relayed', (response: unknown) => {
+			const res = response as { message: string };
+			addLog('socketio', `→ Unity: ${res.message}`);
 		});
 
 		// 명령어 응답 (로컬 처리)
-		socket.on('command:response', (response) => {
-			const status = response.code === 100 ? '✓' : '✗';
-			addLog('socketio', `${status} ${response.message}`);
-			if (response.data) {
-				addLog('socketio', `  데이터: ${JSON.stringify(response.data)}`);
+		addEventHandler('command:response', (response: unknown) => {
+			const res = response as { code: number; message: string; data?: unknown };
+			const status = res.code === 100 ? '✓' : '✗';
+			addLog('socketio', `${status} ${res.message}`);
+			if (res.data) {
+				addLog('socketio', `  데이터: ${JSON.stringify(res.data)}`);
 			}
 		});
 
 		// Unity 서버에서 온 게임 응답
-		socket.on('game:response', (response) => {
-			const status = response.code === 100 ? '✓' : '✗';
-			addLog('game', `${status} ${response.message}`);
-			if (response.data) {
-				addLog('game', `  데이터: ${JSON.stringify(response.data)}`);
+		addEventHandler('game:response', (response: unknown) => {
+			const res = response as { code: number; message: string; data?: unknown };
+			const status = res.code === 100 ? '✓' : '✗';
+			addLog('game', `${status} ${res.message}`);
+			if (res.data) {
+				addLog('game', `  데이터: ${JSON.stringify(res.data)}`);
 			}
 		});
 
 		// Unity 서버에서 온 게임 로그
-		socket.on('game:log', (data) => {
-			addLog('game', data.message || JSON.stringify(data));
+		addEventHandler('game:log', (data: unknown) => {
+			const logData = data as { message?: string };
+			addLog('game', logData.message || JSON.stringify(data));
 		});
 
 		// Unity 서버에서 온 게임 이벤트
-		socket.on('game:event', (data) => {
-			addLog('game', `이벤트: ${data.type || 'unknown'} - ${data.message || JSON.stringify(data)}`);
+		addEventHandler('game:event', (data: unknown) => {
+			const eventData = data as { type?: string; message?: string };
+			addLog(
+				'game',
+				`이벤트: ${eventData.type || 'unknown'} - ${eventData.message || JSON.stringify(data)}`
+			);
 		});
 
 		// 인증 응답
-		socket.on('auth:response', (response) => {
-			const status = response.code === 100 ? '✓ 인증 성공' : '✗ 인증 실패';
-			addLog('socketio', `${status}: ${response.message}`);
+		addEventHandler('auth:response', (response: unknown) => {
+			const res = response as { code: number; message: string };
+			const status = res.code === 100 ? '✓ 인증 성공' : '✗ 인증 실패';
+			addLog('socketio', `${status}: ${res.message}`);
 		});
 
 		// 게임 이벤트: 플레이어 이동
-		socket.on('player:move', (data) => {
-			addLog('game', `플레이어 이동: ${data.username || data.playerId}`);
-			if (data.direction) {
-				addLog('game', `  방향: (${data.direction.x}, ${data.direction.y})`);
+		addEventHandler('player:move', (data: unknown) => {
+			const moveData = data as {
+				username?: string;
+				playerId: string;
+				direction?: { x: number; y: number };
+			};
+			addLog('game', `플레이어 이동: ${moveData.username || moveData.playerId}`);
+			if (moveData.direction) {
+				addLog('game', `  방향: (${moveData.direction.x}, ${moveData.direction.y})`);
 			}
 		});
 
 		// 게임 이벤트: 총알 생성
-		socket.on('bullet:spawn', (data) => {
-			addLog('game', `총알 생성: ${data.username || data.shooterId}`);
-			addLog('game', `  타입: ${data.typeName}, 팀: ${data.teamName}`);
+		addEventHandler('bullet:spawn', (data: unknown) => {
+			const bulletData = data as {
+				username?: string;
+				shooterId: string;
+				typeName: string;
+				teamName: string;
+			};
+			addLog('game', `총알 생성: ${bulletData.username || bulletData.shooterId}`);
+			addLog('game', `  타입: ${bulletData.typeName}, 팀: ${bulletData.teamName}`);
 		});
 
 		// 게임 이벤트: 플레이어 퇴장
-		socket.on('player:leave', (data) => {
-			addLog('game', `플레이어 퇴장: ${data.username || data.playerId}`);
+		addEventHandler('player:leave', (data: unknown) => {
+			const leaveData = data as { username?: string; playerId: string };
+			addLog('game', `플레이어 퇴장: ${leaveData.username || leaveData.playerId}`);
 		});
 
 		// 브로드캐스트 메시지
-		socket.on('broadcast', (data) => {
-			addLog('game', `브로드캐스트: ${data.message} (from: ${data.from})`);
+		addEventHandler('broadcast', (data: unknown) => {
+			const broadcastData = data as { message: string; from: string };
+			addLog('game', `브로드캐스트: ${broadcastData.message} (from: ${broadcastData.from})`);
 		});
 	}
 
@@ -344,13 +375,29 @@
 			'web',
 			'도움말: 대상을 선택하고 명령어를 입력하세요. 웹 콘솔 명령어는 "help"를 입력하세요.'
 		);
-		connectSocket();
+
+		// 현재 연결 상태 동기화
+		isConnected = socketManager.isConnected;
+		isUnityConnected = socketManager.isUnityConnected;
+
+		// 이미 연결되어 있는 경우 메시지 표시
+		if (isConnected) {
+			addLog('socketio', `이미 연결됨 (ID: ${socketManager.clientId})`);
+		}
+
+		// 이벤트 핸들러 등록
+		setupSocketEventHandlers();
+
+		// 아직 연결되지 않은 경우 연결 시도
+		if (!isConnected) {
+			socketManager.connect();
+		}
 	});
 
 	onDestroy(() => {
-		if (socket) {
-			socket.disconnect();
-		}
+		// 이벤트 리스너만 정리 (소켓 연결은 유지)
+		eventCleanupFns.forEach((cleanup) => cleanup());
+		eventCleanupFns = [];
 	});
 </script>
 
@@ -380,7 +427,7 @@
 				자동 스크롤
 			</label>
 			<button class="btn btn-secondary" onclick={clearLogs}>로그 지우기</button>
-			<button class="btn btn-primary" onclick={connectSocket}>재연결</button>
+			<button class="btn btn-primary" onclick={reconnectSocket}>재연결</button>
 		</div>
 	</header>
 
