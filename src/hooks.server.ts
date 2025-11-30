@@ -13,10 +13,17 @@ const connectedClients: Map<string, ConnectedClient> = new Map();
 // Unity 서버 클라이언트들 (여러 Unity 서버 지원)
 const unityServers: Map<string, Socket> = new Map();
 
+// Unity 서버 별칭 저장소
+const unityServerAliases: Map<string, string> = new Map();
+
+// Unity 서버 기본 별칭
+const DEFAULT_UNITY_ALIAS = 'Game Server';
+
 // Unity 서버 정보를 웹 클라이언트에게 전송하기 위한 인터페이스
 interface UnityServerInfo {
 	id: string;
 	connectedAt: string;
+	alias: string;
 }
 
 // 현재 연결된 Unity 서버 목록 가져오기
@@ -27,7 +34,8 @@ function getUnityServerList(): UnityServerInfo[] {
 		if (client) {
 			list.push({
 				id,
-				connectedAt: client.connectedAt.toISOString()
+				connectedAt: client.connectedAt.toISOString(),
+				alias: unityServerAliases.get(id) || DEFAULT_UNITY_ALIAS
 			});
 		}
 	});
@@ -76,7 +84,7 @@ interface UnityCommandPayload {
 function formatUnityPayload(data: CommandData): UnityCommandPayload {
 	// args에서 targetUnityId 제거 후 data로 변환
 	const { targetUnityId: _, ...restArgs } = data.args ?? {};
-	
+
 	return {
 		cmd: data.cmd,
 		data: restArgs
@@ -100,7 +108,9 @@ function relayCommandToUnity(webSocket: Socket, data: CommandData) {
 				code: 404,
 				message: `지정된 Unity 서버를 찾을 수 없습니다: ${targetUnityId}`
 			});
-			console.log(`[Relay] 지정된 Unity 서버 없음 - 명령어 전달 실패: ${data.cmd} (대상: ${targetUnityId})`);
+			console.log(
+				`[Relay] 지정된 Unity 서버 없음 - 명령어 전달 실패: ${data.cmd} (대상: ${targetUnityId})`
+			);
 			return;
 		}
 
@@ -199,6 +209,8 @@ io.on('connection', (socket: Socket) => {
 	// Unity 서버인 경우 저장
 	if (clientType === 'unity') {
 		unityServers.set(socket.id, socket);
+		// 기본 별칭 설정
+		unityServerAliases.set(socket.id, DEFAULT_UNITY_ALIAS);
 		console.log(`[Unity] Unity 서버가 연결되었습니다. (총 ${unityServers.size}개)`);
 
 		// 모든 웹 콘솔에 Unity 서버 연결 알림
@@ -259,6 +271,48 @@ io.on('connection', (socket: Socket) => {
 		});
 	});
 
+	// Unity 서버 별칭 변경 핸들러
+	socket.on('unity:set-alias', (data: { unitySocketId: string; alias: string }) => {
+		const client = connectedClients.get(socket.id);
+
+		// 웹 클라이언트만 별칭 변경 가능
+		if (client?.clientType !== 'web') {
+			socket.emit('unity:set-alias:response', {
+				code: 403,
+				message: '권한이 없습니다.'
+			});
+			return;
+		}
+
+		if (!unityServers.has(data.unitySocketId)) {
+			socket.emit('unity:set-alias:response', {
+				code: 404,
+				message: `Unity 서버를 찾을 수 없습니다: ${data.unitySocketId}`
+			});
+			return;
+		}
+
+		// 별칭이 비어있으면 기본값 사용
+		const newAlias = data.alias?.trim() || DEFAULT_UNITY_ALIAS;
+		unityServerAliases.set(data.unitySocketId, newAlias);
+		console.log(`[Unity] Unity 서버 별칭 변경: ${data.unitySocketId} → "${newAlias}"`);
+
+		// 응답 전송
+		socket.emit('unity:set-alias:response', {
+			code: 100,
+			message: `별칭이 "${newAlias}"(으)로 변경되었습니다.`,
+			unitySocketId: data.unitySocketId,
+			alias: newAlias
+		});
+
+		// 모든 웹 클라이언트에 별칭 변경 알림
+		relayResponseToWeb('unity:alias-changed', {
+			unitySocketId: data.unitySocketId,
+			alias: newAlias,
+			unityServers: getUnityServerList()
+		});
+	});
+
 	// Unity 서버 강제 연결 해제 요청 핸들러
 	socket.on('unity:disconnect', (data: { unitySocketId: string }) => {
 		const client = connectedClients.get(socket.id);
@@ -298,6 +352,7 @@ io.on('connection', (socket: Socket) => {
 		// Unity 서버가 연결 해제된 경우
 		if (client?.clientType === 'unity' && unityServers.has(socket.id)) {
 			unityServers.delete(socket.id);
+			unityServerAliases.delete(socket.id);
 			console.log(`[Unity] Unity 서버 연결이 해제되었습니다. (남은 서버: ${unityServers.size}개)`);
 
 			// 모든 웹 콘솔에 Unity 서버 연결 해제 알림

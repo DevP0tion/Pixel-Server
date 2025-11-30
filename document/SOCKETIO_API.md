@@ -65,14 +65,14 @@ Pixel Server는 Socket.IO를 사용하여 실시간 양방향 통신을 지원�
 import { io } from 'socket.io-client';
 
 const socket = io('http://localhost:7777', {
-  transports: ['websocket', 'polling'],
-  query: {
-    clientType: 'web'
-  },
-  reconnection: true,
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000
+	transports: ['websocket', 'polling'],
+	query: {
+		clientType: 'web'
+	},
+	reconnection: true,
+	reconnectionAttempts: Infinity,
+	reconnectionDelay: 1000,
+	reconnectionDelayMax: 5000
 });
 ```
 
@@ -99,21 +99,21 @@ ALLOWED_ORIGINS=http://localhost:3000,http://example.com
 
 ## 클라이언트 타입
 
-| 타입 | 설명 | Room |
-|------|------|------|
-| `web` | 웹 콘솔 클라이언트 | `web` |
-| `unity` | Unity 게임 서버 | `game` |
+| 타입    | 설명               | Room   |
+| ------- | ------------------ | ------ |
+| `web`   | 웹 콘솔 클라이언트 | `web`  |
+| `unity` | Unity 게임 서버    | `game` |
 
 ### 클라이언트 정보 인터페이스
 
 ```typescript
 interface ConnectedClient {
-  socket: Socket;        // 소켓 인스턴스
-  id: string;           // 소켓 ID
-  clientType: ClientType; // 'unity' 또는 'web'
-  authenticated: boolean; // 인증 여부
-  username?: string;     // 사용자명 (선택)
-  connectedAt: Date;    // 연결 시간
+	socket: Socket; // 소켓 인스턴스
+	id: string; // 소켓 ID
+	clientType: ClientType; // 'unity' 또는 'web'
+	authenticated: boolean; // 인증 여부
+	username?: string; // 사용자명 (선택)
+	connectedAt: Date; // 연결 시간
 }
 ```
 
@@ -183,8 +183,35 @@ Unity 서버 강제 연결 해제 요청에 대한 응답입니다.
 ```typescript
 // 페이로드
 {
-  code: number;    // 응답 코드 (100: 성공, 403: 권한 없음, 404: 서버 없음)
-  message: string; // 응답 메시지
+	code: number; // 응답 코드 (100: 성공, 403: 권한 없음, 404: 서버 없음)
+	message: string; // 응답 메시지
+}
+```
+
+#### `unity:set-alias:response`
+
+Unity 서버 별칭 변경 요청에 대한 응답입니다.
+
+```typescript
+// 페이로드
+{
+	code: number;          // 응답 코드 (100: 성공, 403: 권한 없음, 404: 서버 없음)
+	message: string;       // 응답 메시지
+	unitySocketId?: string; // 변경된 Unity 서버 ID (성공 시)
+	alias?: string;        // 변경된 별칭 (성공 시)
+}
+```
+
+#### `unity:alias-changed`
+
+Unity 서버 별칭이 변경되었을 때 모든 웹 클라이언트에 전송됩니다.
+
+```typescript
+// 페이로드
+{
+	unitySocketId: string;           // 별칭이 변경된 Unity 서버 ID
+	alias: string;                   // 새 별칭
+	unityServers: UnityServerInfo[]; // 전체 Unity 서버 목록
 }
 ```
 
@@ -300,9 +327,26 @@ Unity 서버로 전달할 명령어를 전송합니다.
 ```typescript
 // 페이로드
 {
-  unitySocketId: string; // 연결 해제할 Unity 서버 ID
+	unitySocketId: string; // 연결 해제할 Unity 서버 ID
 }
 ```
+
+#### `unity:set-alias`
+
+Unity 서버의 별칭을 변경합니다. (웹 클라이언트만 가능)
+
+```typescript
+// 페이로드
+{
+	unitySocketId: string; // 별칭을 변경할 Unity 서버 ID
+	alias: string;         // 새 별칭 (빈 문자열이면 'Game Server'로 설정)
+}
+```
+
+**응답 이벤트:**
+
+- `unity:set-alias:response`: 요청한 클라이언트에게 응답
+- `unity:alias-changed`: 모든 웹 클라이언트에게 변경 알림
 
 ---
 
@@ -310,19 +354,19 @@ Unity 서버로 전달할 명령어를 전송합니다.
 
 ### 등록된 명령어
 
-| 명령어 | 설명 | 응답 이벤트 |
-|--------|------|-------------|
-| `ping` | 서버 연결 확인 (pong 응답) | `command:response` |
-| `status` | 서버 상태 조회 | `command:response` |
-| `help` | 사용 가능한 명령어 목록 | `command:response` |
-| `server:info` | 서버 상세 정보 조회 | `command:response` |
+| 명령어        | 설명                       | 응답 이벤트        |
+| ------------- | -------------------------- | ------------------ |
+| `ping`        | 서버 연결 확인 (pong 응답) | `command:response` |
+| `status`      | 서버 상태 조회             | `command:response` |
+| `help`        | 사용 가능한 명령어 목록    | `command:response` |
+| `server:info` | 서버 상세 정보 조회        | `command:response` |
 
 ### 명령어 데이터 형식
 
 ```typescript
 interface CommandData {
-  cmd: string;                    // 명령어 이름
-  args?: Record<string, unknown>; // 명령어 인자
+	cmd: string; // 명령어 이름
+	args?: Record<string, unknown>; // 명령어 인자
 }
 ```
 
@@ -330,9 +374,9 @@ interface CommandData {
 
 ```typescript
 interface CommandResponse {
-  code: number;    // 응답 코드
-  message: string; // 응답 메시지
-  data?: unknown;  // 추가 데이터 (선택)
+	code: number; // 응답 코드
+	message: string; // 응답 메시지
+	data?: unknown; // 추가 데이터 (선택)
 }
 ```
 
@@ -344,8 +388,8 @@ socket.emit('svelte:command', { cmd: 'ping' });
 
 // 결과 수신
 socket.on('command:response', (response) => {
-  console.log(response);
-  // { code: 100, message: 'pong', data: { timestamp: 1234567890 } }
+	console.log(response);
+	// { code: 100, message: 'pong', data: { timestamp: 1234567890 } }
 });
 ```
 
@@ -357,8 +401,9 @@ socket.on('command:response', (response) => {
 
 ```typescript
 interface UnityServerInfo {
-  id: string;          // Unity 서버 소켓 ID
-  connectedAt: string; // 연결 시간 (ISO 8601)
+	id: string; // Unity 서버 소켓 ID
+	connectedAt: string; // 연결 시간 (ISO 8601)
+	alias: string; // 서버 별칭 (기본값: 'Game Server')
 }
 ```
 
@@ -372,8 +417,8 @@ type ClientType = 'unity' | 'web';
 
 ```typescript
 interface AuthPacket {
-  username: string;
-  password: string;
+	username: string;
+	password: string;
 }
 ```
 
@@ -381,8 +426,8 @@ interface AuthPacket {
 
 ```typescript
 interface AuthResponseMessage {
-  code: number;
-  message: string;
+	code: number;
+	message: string;
 }
 ```
 
@@ -390,8 +435,8 @@ interface AuthResponseMessage {
 
 ```typescript
 interface MovePacket {
-  direction: { x: number; y: number };
-  canceled: boolean;
+	direction: { x: number; y: number };
+	canceled: boolean;
 }
 ```
 
@@ -399,11 +444,11 @@ interface MovePacket {
 
 ```typescript
 interface BulletPacket {
-  typeName: string;
-  teamName: string;
-  startPos: { x: number; y: number; z: number };
-  targetPos: { x: number; y: number; z: number };
-  damage: number;
+	typeName: string;
+	teamName: string;
+	startPos: { x: number; y: number; z: number };
+	targetPos: { x: number; y: number; z: number };
+	damage: number;
 }
 ```
 
@@ -411,12 +456,12 @@ interface BulletPacket {
 
 ## 응답 코드
 
-| 코드 | 설명 |
-|------|------|
-| `100` | 성공 |
-| `403` | 권한 없음 |
+| 코드  | 설명                                                      |
+| ----- | --------------------------------------------------------- |
+| `100` | 성공                                                      |
+| `403` | 권한 없음                                                 |
 | `404` | 리소스를 찾을 수 없음 (명령어 미등록, Unity 서버 없음 등) |
-| `503` | 서비스 이용 불가 (Unity 서버 연결 안됨) |
+| `503` | 서비스 이용 불가 (Unity 서버 연결 안됨)                   |
 
 ---
 
@@ -428,29 +473,29 @@ interface BulletPacket {
 import { io } from 'socket.io-client';
 
 const socket = io('http://localhost:7777', {
-  query: { clientType: 'web' }
+	query: { clientType: 'web' }
 });
 
 // 연결 이벤트
 socket.on('connect', () => {
-  console.log('서버에 연결되었습니다:', socket.id);
+	console.log('서버에 연결되었습니다:', socket.id);
 });
 
 // 환영 메시지 수신
 socket.on('welcome', (data) => {
-  console.log('환영 메시지:', data.message);
-  console.log('Unity 서버 연결 상태:', data.unityConnected);
-  console.log('연결된 Unity 서버:', data.unityServers);
+	console.log('환영 메시지:', data.message);
+	console.log('Unity 서버 연결 상태:', data.unityConnected);
+	console.log('연결된 Unity 서버:', data.unityServers);
 });
 
 // Unity 서버 연결 알림
 socket.on('unity:connected', (data) => {
-  console.log('Unity 서버가 연결되었습니다:', data.unitySocketId);
+	console.log('Unity 서버가 연결되었습니다:', data.unitySocketId);
 });
 
 // Unity 서버 연결 해제 알림
 socket.on('unity:disconnected', (data) => {
-  console.log('Unity 서버 연결이 해제되었습니다:', data.unitySocketId);
+	console.log('Unity 서버 연결이 해제되었습니다:', data.unitySocketId);
 });
 ```
 
@@ -465,12 +510,12 @@ socket.emit('svelte:command', { cmd: 'server:info' });
 
 // 응답 수신
 socket.on('command:response', (response) => {
-  if (response.code === 100) {
-    console.log('성공:', response.message);
-    console.log('데이터:', response.data);
-  } else {
-    console.error('오류:', response.message);
-  }
+	if (response.code === 100) {
+		console.log('성공:', response.message);
+		console.log('데이터:', response.data);
+	} else {
+		console.error('오류:', response.message);
+	}
 });
 ```
 
@@ -479,22 +524,22 @@ socket.on('command:response', (response) => {
 ```typescript
 // 모든 Unity 서버로 브로드캐스트
 socket.emit('unity:command', {
-  cmd: 'game:pause',
-  args: { reason: 'maintenance' }
+	cmd: 'game:pause',
+	args: { reason: 'maintenance' }
 });
 
 // 특정 Unity 서버에만 전송
 socket.emit('unity:command', {
-  cmd: 'game:pause',
-  args: {
-    targetUnityId: 'abc123',
-    reason: 'maintenance'
-  }
+	cmd: 'game:pause',
+	args: {
+		targetUnityId: 'abc123',
+		reason: 'maintenance'
+	}
 });
 
 // 전달 확인
 socket.on('command:relayed', (response) => {
-  console.log('명령어 전달됨:', response.targetUnityIds);
+	console.log('명령어 전달됨:', response.targetUnityIds);
 });
 ```
 
@@ -506,10 +551,34 @@ socket.emit('unity:list');
 
 // 응답 수신
 socket.on('unity:list', (data) => {
-  console.log('연결된 Unity 서버 목록:', data.unityServers);
-  data.unityServers.forEach((server) => {
-    console.log(`- ID: ${server.id}, 연결 시간: ${server.connectedAt}`);
-  });
+	console.log('연결된 Unity 서버 목록:', data.unityServers);
+	data.unityServers.forEach((server) => {
+		console.log(`- ${server.alias} (ID: ${server.id}), 연결 시간: ${server.connectedAt}`);
+	});
+});
+```
+
+### Unity 서버 별칭 변경
+
+```typescript
+// 별칭 변경 요청
+socket.emit('unity:set-alias', {
+	unitySocketId: 'abc123',
+	alias: 'Production Server'
+});
+
+// 응답 수신
+socket.on('unity:set-alias:response', (response) => {
+	if (response.code === 100) {
+		console.log('별칭 변경 성공:', response.alias);
+	} else {
+		console.error('별칭 변경 실패:', response.message);
+	}
+});
+
+// 다른 클라이언트에서 별칭 변경 알림 수신
+socket.on('unity:alias-changed', (data) => {
+	console.log(`서버 ${data.unitySocketId}의 별칭이 "${data.alias}"(으)로 변경되었습니다.`);
 });
 ```
 
@@ -521,11 +590,11 @@ socket.emit('unity:disconnect', { unitySocketId: 'abc123' });
 
 // 응답 수신
 socket.on('unity:disconnect:response', (response) => {
-  if (response.code === 100) {
-    console.log('연결 해제 성공:', response.message);
-  } else {
-    console.error('연결 해제 실패:', response.message);
-  }
+	if (response.code === 100) {
+		console.log('연결 해제 성공:', response.message);
+	} else {
+		console.error('연결 해제 실패:', response.message);
+	}
 });
 ```
 
@@ -547,16 +616,16 @@ console.log('Unity 서버 목록:', socketManager.unityServers);
 
 // 상태 변경 이벤트 구독
 socketManager.on('stateChange', (state) => {
-  console.log('상태 변경:', state);
+	console.log('상태 변경:', state);
 });
 
 // 이벤트 구독
 socketManager.on('welcome', (data) => {
-  console.log('환영:', data);
+	console.log('환영:', data);
 });
 
 socketManager.on('unity:connected', (data) => {
-  console.log('Unity 연결:', data);
+	console.log('Unity 연결:', data);
 });
 
 // 명령어 전송

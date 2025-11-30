@@ -16,6 +16,7 @@ export interface SocketState {
 export interface UnityServerInfo {
 	id: string;
 	connectedAt: string;
+	alias: string;
 }
 
 // 소켓 관리자 클래스
@@ -141,6 +142,15 @@ class SocketManager extends EventEmitter {
 			this.emit('stateChange', this.getState());
 		});
 
+		// Unity 서버 별칭 변경 알림
+		this.socket.on('unity:alias-changed', (data) => {
+			if (data.unityServers) {
+				this._unityServers = data.unityServers;
+			}
+			this.emit('unity:alias-changed', data);
+			this.emit('stateChange', this.getState());
+		});
+
 		// 기타 이벤트들 - 페이지에서 직접 구독할 수 있도록 전달
 		const forwardEvents = [
 			'command:relayed',
@@ -153,7 +163,8 @@ class SocketManager extends EventEmitter {
 			'bullet:spawn',
 			'player:leave',
 			'broadcast',
-			'unity:disconnect:response'
+			'unity:disconnect:response',
+			'unity:set-alias:response'
 		];
 
 		forwardEvents.forEach((event) => {
