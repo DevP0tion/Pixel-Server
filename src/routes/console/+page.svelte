@@ -183,7 +183,7 @@
 	// 소켓 이벤트 핸들러 등록
 	function setupSocketEventHandlers() {
 		// 이벤트 리스너 헬퍼 함수
-		function addEventHandler(event: string, handler: (...args: unknown[]) => void) {
+		function addEventHandler(event: string, handler: (...args: any[]) => void) {
 			socketManager.on(event, handler);
 			eventCleanupFns.push(() => socketManager.off(event, handler));
 		}
@@ -244,12 +244,11 @@
 		});
 
 		// Unity 서버 연결 해제 알림
-		addEventHandler('unity:disconnected', (data: unknown) => {
-			const unityData = data as { message: string; serverId?: string };
+		addEventHandler('unity:disconnected', (data: { message: string; serverId?: string }) => {
 			// 특정 서버가 연결 해제된 경우
-			if (unityData.serverId) {
-				connectedUnityServers = connectedUnityServers.filter((s) => s.id !== unityData.serverId);
-				if (selectedUnityServer === unityData.serverId) {
+			if (data.serverId) {
+				connectedUnityServers = connectedUnityServers.filter((s) => s.id !== data.serverId);
+				if (selectedUnityServer === data.serverId) {
 					selectedUnityServer = 'all';
 				}
 			}
@@ -257,7 +256,7 @@
 			if (connectedUnityServers.length === 0) {
 				isUnityConnected = false;
 			}
-			addLog('game', `✗ ${unityData.message}`);
+			addLog('game', `✗ ${data.message}`);
 		});
 
 		// 명령어 전달 완료 응답
@@ -269,7 +268,7 @@
 		// 명령어 응답 (로컬 처리)
 		addEventHandler('command:response', (response: unknown) => {
 			const res = response as { code: number; message: string; data?: unknown };
-			const status = res.code === 100 ? '✓' : '✗';
+			const status = res.code === 100 ? '' : '✗';
 			addLog('socketio', `${status} ${res.message}`);
 			if (res.data) {
 				addLog('socketio', `  데이터: ${JSON.stringify(res.data)}`);
@@ -299,44 +298,6 @@
 				'game',
 				`이벤트: ${eventData.type || 'unknown'} - ${eventData.message || JSON.stringify(data)}`
 			);
-		});
-
-		// 인증 응답
-		addEventHandler('auth:response', (response: unknown) => {
-			const res = response as { code: number; message: string };
-			const status = res.code === 100 ? '✓ 인증 성공' : '✗ 인증 실패';
-			addLog('socketio', `${status}: ${res.message}`);
-		});
-
-		// 게임 이벤트: 플레이어 이동
-		addEventHandler('player:move', (data: unknown) => {
-			const moveData = data as {
-				username?: string;
-				playerId: string;
-				direction?: { x: number; y: number };
-			};
-			addLog('game', `플레이어 이동: ${moveData.username || moveData.playerId}`);
-			if (moveData.direction) {
-				addLog('game', `  방향: (${moveData.direction.x}, ${moveData.direction.y})`);
-			}
-		});
-
-		// 게임 이벤트: 총알 생성
-		addEventHandler('bullet:spawn', (data: unknown) => {
-			const bulletData = data as {
-				username?: string;
-				shooterId: string;
-				typeName: string;
-				teamName: string;
-			};
-			addLog('game', `총알 생성: ${bulletData.username || bulletData.shooterId}`);
-			addLog('game', `  타입: ${bulletData.typeName}, 팀: ${bulletData.teamName}`);
-		});
-
-		// 게임 이벤트: 플레이어 퇴장
-		addEventHandler('player:leave', (data: unknown) => {
-			const leaveData = data as { username?: string; playerId: string };
-			addLog('game', `플레이어 퇴장: ${leaveData.username || leaveData.playerId}`);
 		});
 
 		// 브로드캐스트 메시지

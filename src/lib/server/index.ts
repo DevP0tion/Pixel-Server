@@ -14,8 +14,5 @@ export type {
 // Command Handler
 export { SocketCommandHandler } from './SocketCommandHandler.js';
 
-// Handlers
-export { loadAccounts } from './handlers.js';
-
 // Commands
 export { loadCommands } from './commands.js';

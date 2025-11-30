@@ -4,7 +4,6 @@ import {
 	type ConnectedClient,
 	type ClientType,
 	SocketCommandHandler,
-	loadAccounts
 } from '$lib/server/index.js';
 import { loadCommands } from '$lib/server/commands.js';
 
@@ -40,9 +39,6 @@ function getUnityServerSocket(): Socket | null {
 	if (unityServers.size === 0) return null;
 	return unityServers.values().next().value ?? null;
 }
-
-// 계정 정보 로드
-const accounts = loadAccounts();
 
 // CORS 설정
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -244,13 +240,6 @@ io.on('connection', (socket: Socket) => {
 		}
 
 		connectedClients.delete(socket.id);
-
-		// 다른 클라이언트들에게 플레이어 퇴장 알림
-		socket.broadcast.emit('player:leave', {
-			playerId: socket.id,
-			username: client?.username,
-			clientType: client?.clientType
-		});
 	});
 
 	// 환영 메시지 전송

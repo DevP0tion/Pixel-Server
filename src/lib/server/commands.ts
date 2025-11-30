@@ -1,6 +1,7 @@
 import type { SocketCommandHandler } from './SocketCommandHandler.js';
 import type { ConnectedClient } from './types.js';
 import { createStatusHandler, handlePing } from './handlers.js';
+import { translate } from './i18n/serverLocalizer.js';
 
 /**
  * 소켓 명령어 핸들러에 기본 명령어들을 등록합니다.
@@ -19,19 +20,17 @@ export function loadCommands(
 
 	// 도움말 명령어
 	commandHandler.registerCommand('help', (socket) => {
+    const cmdInfo: { [key: string]: string } = {};
+    
+    for (const cmd of commandHandler.commandHandlers.keys()) {
+      cmdInfo[cmd] = translate(`${cmd}`, 'No description available.');
+    }
+    console.log(cmdInfo)
+    
 		socket.emit('command:response', {
 			code: 100,
-			message: '사용 가능한 명령어',
-			data: {
-				commands: Array.from(commandHandler.commandHandlers.keys()),
-				description: {
-					ping: '서버 연결 확인',
-					status: '서버 상태 조회',
-					auth: '사용자 인증',
-					help: '명령어 도움말',
-					'server:info': '서버 정보 조회'
-				}
-			}
+			message: '사용 가능한 명령어 test\n test',
+			data: cmdInfo
 		});
 	});
 
