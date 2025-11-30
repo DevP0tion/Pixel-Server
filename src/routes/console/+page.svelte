@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { socketManager } from '$lib/socket';
-	import { logStore, type LogType, type LogEntry } from '$lib/logStore';
+	import { logStore, type LogEntry } from '$lib/logStore';
+	import {
+		addLog,
+		getLogPrefix,
+		clearLogs,
+		reconnectSocket,
+		parseCommand,
+		handleWebCommand,
+		sendToServer
+	} from './command';
 
 	// 상태 (로그는 logStore에서 관리)
 	let logs: LogEntry[] = $state(logStore.logs);
@@ -35,25 +44,6 @@
 		})
 	);
 
-	// 로그 추가 함수
-	function addLog(type: LogType, message: string) {
-		logStore.addLog(type, message);
-	}
-
-	// 로그 타입별 프리픽스
-	function getLogPrefix(type: LogType): string {
-		switch (type) {
-			case 'game':
-				return '[Game]';
-			case 'socketio':
-				return '[SocketIO]';
-			case 'web':
-				return '[Web]';
-			default:
-				return '[Unknown]';
-		}
-	}
-
 	// 명령어 전송
 	function sendCommand() {
 		if (!commandInput.trim()) return;
@@ -64,93 +54,20 @@
 		// 대상에 따른 처리
 		if (commandTarget === 'web') {
 			// 웹 콘솔 명령어 (로컬 처리)
-			handleWebCommand(input);
+			handleWebCommand(input, () => ({
+				isConnected,
+				isUnityConnected,
+				commandTarget
+			}));
 			commandInput = '';
 			return;
 		}
 
-		// 명령어 파싱
-		const parts = input.split(' ');
-		const cmd = parts[0];
-		let args: Record<string, unknown> = {};
-
-		// 간단한 명령어 파싱
-		try {
-			if (parts.length > 1) {
-				const argsString = parts.slice(1).join(' ');
-				// JSON 형식인 경우
-				if (argsString.startsWith('{')) {
-					args = JSON.parse(argsString);
-				} else {
-					// key=value 형식인 경우
-					parts.slice(1).forEach((part) => {
-						const [key, value] = part.split('=');
-						if (key && value !== undefined) {
-							// 숫자인 경우 변환
-							args[key] = isNaN(Number(value)) ? value : Number(value);
-						}
-					});
-				}
-			}
-		} catch {
-			addLog('web', `명령어 파싱 오류: ${input}`);
-		}
-
-		// Socket.IO로 명령어 전송
-		if (isConnected) {
-			if (commandTarget === 'svelte') {
-				// Svelte 서버 명령어 (svelte:command 이벤트로 전송)
-				socketManager.sendSocketEvent('svelte:command', { cmd, args });
-				addLog('socketio', `Svelte 서버 명령어: ${cmd}`);
-			} else {
-				// Unity 서버 명령어 (unity:command 이벤트로 전송)
-				const targetServer = selectedUnityServer === 'all' ? undefined : selectedUnityServer;
-				socketManager.sendSocketEvent('unity:command', { cmd, args, targetServer });
-				const serverInfo =
-					selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer})`;
-				addLog('socketio', `${serverInfo}로 명령어 전송: ${cmd}`);
-			}
-		} else {
-			addLog('web', '소켓 연결이 없습니다. 연결을 시도합니다...');
-			reconnectSocket();
-		}
+		// 명령어 파싱 및 전송
+		const parsedCommand = parseCommand(input);
+		sendToServer(parsedCommand, commandTarget, selectedUnityServer, isConnected);
 
 		commandInput = '';
-	}
-
-	// 웹 콘솔 명령어 처리
-	function handleWebCommand(input: string) {
-		const parts = input.split(' ');
-		const cmd = parts[0].toLowerCase();
-
-		switch (cmd) {
-			case 'help':
-				addLog('web', '사용 가능한 웹 콘솔 명령어:');
-				addLog('web', '  help - 도움말 표시');
-				addLog('web', '  clear - 로그 지우기');
-				addLog('web', '  reconnect - 소켓 재연결');
-				addLog('web', '  status - 연결 상태 확인');
-				break;
-			case 'clear':
-				clearLogs();
-				break;
-			case 'reconnect':
-				reconnectSocket();
-				break;
-			case 'status':
-				addLog('web', `Svelte 서버: ${isConnected ? '연결됨' : '연결 끊김'}`);
-				addLog('web', `Unity 서버: ${isUnityConnected ? '연결됨' : '연결 끊김'}`);
-				addLog('web', `현재 대상: ${commandTarget}`);
-				break;
-			default:
-				addLog('web', `알 수 없는 명령어: ${cmd}. 'help'를 입력하여 도움말을 확인하세요.`);
-		}
-	}
-
-	// 소켓 재연결
-	function reconnectSocket() {
-		addLog('web', 'Socket.IO 서버에 재연결 중...');
-		socketManager.reconnect();
 	}
 
 	// 소켓 이벤트 핸들러 등록
@@ -281,12 +198,6 @@
 			const broadcastData = data as { message: string; from: string };
 			addLog('game', `브로드캐스트: ${broadcastData.message} (from: ${broadcastData.from})`);
 		});
-	}
-
-	// 로그 지우기
-	function clearLogs() {
-		logStore.clearLogs();
-		addLog('web', '로그가 지워졌습니다.');
 	}
 
 	// 키보드 이벤트 핸들러
