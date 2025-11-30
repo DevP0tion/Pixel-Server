@@ -3,7 +3,7 @@ import {
 	type CommandData,
 	type ConnectedClient,
 	type ClientType,
-	SocketCommandHandler,
+	SocketCommandHandler
 } from '$lib/server/index.js';
 import { loadCommands } from '$lib/server/commands.js';
 

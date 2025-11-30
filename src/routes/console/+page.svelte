@@ -269,7 +269,15 @@
 		addEventHandler('command:response', (response: unknown) => {
 			const res = response as { code: number; message: string; data?: unknown };
 			const status = res.code === 100 ? '' : '✗';
-			addLog('socketio', `${status} ${res.message}`);
+			// 메시지에 \n이 포함된 경우 여러 줄로 출력
+			const lines = res.message.split('\n');
+			lines.forEach((line, index) => {
+				if (index === 0) {
+					addLog('socketio', `${status} ${line}`);
+				} else {
+					addLog('socketio', line);
+				}
+			});
 			if (res.data) {
 				addLog('socketio', `  데이터: ${JSON.stringify(res.data)}`);
 			}

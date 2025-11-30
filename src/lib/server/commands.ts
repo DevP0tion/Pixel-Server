@@ -10,7 +10,7 @@ import { translate } from './i18n/serverLocalizer.js';
  */
 export function loadCommands(
 	commandHandler: SocketCommandHandler,
-	connectedClients: Map<string, ConnectedClient>,
+	connectedClients: Map<string, ConnectedClient>
 ) {
 	// 상태 조회 명령어
 	commandHandler.registerCommand('status', createStatusHandler(connectedClients));
@@ -20,17 +20,16 @@ export function loadCommands(
 
 	// 도움말 명령어
 	commandHandler.registerCommand('help', (socket) => {
-    const cmdInfo: { [key: string]: string } = {};
-    
-    for (const cmd of commandHandler.commandHandlers.keys()) {
-      cmdInfo[cmd] = translate(`${cmd}`, 'No description available.');
-    }
-    console.log(cmdInfo)
-    
+		const lines: string[] = ['사용 가능한 명령어:'];
+
+		for (const cmd of commandHandler.commandHandlers.keys()) {
+			const description = translate(`${cmd}`, 'No description available.');
+			lines.push(`  ${cmd} / ${description}`);
+		}
+
 		socket.emit('command:response', {
 			code: 100,
-			message: '사용 가능한 명령어 test\n test',
-			data: cmdInfo
+			message: lines.join('\n')
 		});
 	});
 
