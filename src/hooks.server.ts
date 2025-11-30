@@ -75,8 +75,7 @@ interface UnityCommandPayload {
  */
 function formatUnityPayload(data: CommandData): UnityCommandPayload {
 	// args에서 targetUnityId 제거 후 data로 변환
-	const { targetUnityId, ...restArgs } = data.args ?? {};
-	void targetUnityId; // unused variable 경고 방지
+	const { targetUnityId: _, ...restArgs } = data.args ?? {};
 	
 	return {
 		cmd: data.cmd,
@@ -110,7 +109,7 @@ function relayCommandToUnity(webSocket: Socket, data: CommandData) {
 			webSocket.emit('command:relayed', {
 				code: 100,
 				message: `Unity 서버로 명령어 전달됨: ${data.cmd}`,
-				targetUnityId: unitySocket.id,
+				targetUnityIds: [unitySocket.id],
 				data: unityPayload
 			});
 			console.log(`[Relay] 웹 → Unity(${unitySocket.id}): ${data.cmd}`);
