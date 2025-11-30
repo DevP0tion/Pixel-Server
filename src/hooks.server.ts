@@ -62,10 +62,29 @@ loadCommands(commandHandler, connectedClients);
 /**
  * Unity 서버로 명령어를 전달하는 함수
  * @param webSocket 웹 콘솔 소켓 (응답을 받을 소켓)
- * @param data 명령어 데이터
+ * @param data 명령어 데이터 (args.targetUnityId로 특정 Unity 서버 지정 가능)
  */
 function relayCommandToUnity(webSocket: Socket, data: CommandData) {
-	const unitySocket = getUnityServerSocket();
+	// targetUnityId가 지정된 경우 해당 서버로, 아니면 첫 번째 서버로 전송
+	const targetUnityId = data.args?.targetUnityId as string | undefined;
+	let unitySocket: Socket | null = null;
+
+	if (targetUnityId) {
+		// 특정 Unity 서버 ID가 지정된 경우
+		unitySocket = unityServers.get(targetUnityId) ?? null;
+		if (!unitySocket) {
+			webSocket.emit('command:response', {
+				code: 404,
+				message: `지정된 Unity 서버를 찾을 수 없습니다: ${targetUnityId}`
+			});
+			console.log(`[Relay] 지정된 Unity 서버 없음 - 명령어 전달 실패: ${data.cmd} (대상: ${targetUnityId})`);
+			return;
+		}
+	} else {
+		// targetUnityId가 없으면 첫 번째 Unity 서버 사용
+		unitySocket = getUnityServerSocket();
+	}
+
 	if (unitySocket && unitySocket.connected) {
 		// Unity 서버로 명령어 전달
 		unitySocket.emit('unity:command', data);
@@ -74,10 +93,11 @@ function relayCommandToUnity(webSocket: Socket, data: CommandData) {
 		webSocket.emit('command:relayed', {
 			code: 100,
 			message: `Unity 서버로 명령어 전달됨: ${data.cmd}`,
+			targetUnityId: unitySocket.id,
 			data: data
 		});
 
-		console.log(`[Relay] 웹 → Unity: ${data.cmd}`);
+		console.log(`[Relay] 웹 → Unity(${unitySocket.id}): ${data.cmd}`);
 	} else {
 		// Unity 서버가 연결되어 있지 않음
 		webSocket.emit('command:response', {
