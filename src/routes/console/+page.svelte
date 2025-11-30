@@ -38,15 +38,6 @@
 	// 로그 추가 함수
 	function addLog(type: LogType, message: string) {
 		logStore.addLog(type, message);
-
-		// 자동 스크롤
-		if (autoScroll && logContainer) {
-			setTimeout(() => {
-				if (logContainer) {
-					logContainer.scrollTop = logContainer.scrollHeight;
-				}
-			}, 10);
-		}
 	}
 
 	// 로그 타입별 프리픽스
@@ -318,6 +309,14 @@
 		// logStore 이벤트 핸들러 등록
 		const handleLogAdded = () => {
 			logs = logStore.logs;
+			// 자동 스크롤
+			if (autoScroll && logContainer) {
+				setTimeout(() => {
+					if (logContainer) {
+						logContainer.scrollTop = logContainer.scrollHeight;
+					}
+				}, 10);
+			}
 		};
 		const handleLogsCleared = () => {
 			logs = logStore.logs;
@@ -329,8 +328,10 @@
 			logStore.off('logsCleared', handleLogsCleared);
 		});
 
-		// 기존 로그가 없는 경우에만 시작 메시지 추가
-		if (logStore.logs.length === 0) {
+		// 처음 초기화되는 경우에만 시작 메시지 추가
+		const isFirstInit = !logStore.initialized;
+		if (isFirstInit) {
+			logStore.initialized = true;
 			addLog('web', 'Pixel Server 콘솔이 시작되었습니다.');
 			addLog('web', '아키텍처: 웹 콘솔 → Svelte 서버 → Unity 서버');
 			addLog(
@@ -343,8 +344,8 @@
 		isConnected = socketManager.isConnected;
 		isUnityConnected = socketManager.isUnityConnected;
 
-		// 이미 연결되어 있는 경우 메시지 표시 (기존 로그가 없을 때만)
-		if (isConnected && logStore.logs.length <= 3) {
+		// 이미 연결되어 있는 경우 메시지 표시 (처음 초기화할 때만)
+		if (isConnected && isFirstInit) {
 			addLog('socketio', `이미 연결됨 (ID: ${socketManager.clientId})`);
 		}
 

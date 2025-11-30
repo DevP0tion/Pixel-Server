@@ -18,6 +18,7 @@ export interface LogEntry {
 class LogStore extends EventEmitter {
 	private _logs: LogEntry[] = [];
 	private _idCounter = 0;
+	private _initialized = false;
 
 	// 로그 목록 getter
 	get logs(): LogEntry[] {
@@ -27,6 +28,16 @@ class LogStore extends EventEmitter {
 	// 현재 ID 카운터 getter
 	get idCounter(): number {
 		return this._idCounter;
+	}
+
+	// 초기화 상태 getter
+	get initialized(): boolean {
+		return this._initialized;
+	}
+
+	// 초기화 상태 setter
+	set initialized(value: boolean) {
+		this._initialized = value;
 	}
 
 	// 로그 추가
@@ -45,7 +56,7 @@ class LogStore extends EventEmitter {
 	// 로그 지우기
 	clearLogs(): void {
 		this._logs = [];
-		this._idCounter = 0;
+		// ID 카운터는 초기화하지 않음 (고유 ID 보장)
 		this.emit('logsCleared');
 	}
 }
