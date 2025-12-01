@@ -216,12 +216,24 @@
 		// Unity 서버에서 온 게임 응답
 		addEventHandler('game:response', (payload: string) => {
 			const response: UnityResponsePayload = JSON.parse(payload);
-			const status = response.code === 100 ? '✓' : '✗';
-			addLog('game', `${status} ${response.message}`);
-			console.log(response);
-			console.log(response.code);
-			if (response.data) {
-				addLog('game', `  데이터: ${response.data}`); // 데이터는 이미 직렬화된 문자열임
+
+			switch (response.code) {
+				case 100:
+					addLog('game', `✓ ${response.message}`);
+					addLog('game', `  데이터: ${response.data}`); // 데이터는 이미 직렬화된 문자열임
+					break;
+				case 101:
+					// 메세지
+					break;
+				case 200:
+					// 경고
+					break;
+				case 300:
+					// 오류
+					break;
+				default:
+					addLog('game', `알 수 없는 코드: ${response.code} - ${response.message}`);
+					break;
 			}
 		});
 
