@@ -203,10 +203,8 @@
 			'command:response',
 			(response: { code: number; message: string; data?: any }) => {
 				const status = response.code === 100 ? '' : '✗';
-				// 메시지에 \n이 포함된 경우 여러 줄로 출력
-				const [firstLine, ...otherLines] = response.message.split('\n');
-				addLog('socketio', `${status} ${firstLine}`);
-				otherLines.forEach((line) => addLog('socketio', line));
+				// 메시지에 \n이 포함된 경우에도 그대로 저장 (렌더링 시 줄바꿈으로 표시)
+				addLog('socketio', `${status} ${response.message}`);
 				if (response.data) {
 					addLog('socketio', `  데이터: ${JSON.stringify(response.data)}`);
 				}
@@ -643,6 +641,7 @@
 	.log-message {
 		color: #ecf0f1;
 		word-break: break-all;
+		white-space: pre-wrap;
 	}
 
 	/* 명령어 입력 */
