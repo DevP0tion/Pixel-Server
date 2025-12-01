@@ -26,6 +26,12 @@ interface UnityServerInfo {
 	alias: string;
 }
 
+export interface UnityResponsePayload {
+	code: number;
+	message: string;
+	data: any;
+}
+
 // 현재 연결된 Unity 서버 목록 가져오기
 function getUnityServerList(): UnityServerInfo[] {
 	const list: UnityServerInfo[] = [];
@@ -170,7 +176,7 @@ function relayCommandToUnity(webSocket: Socket, data: CommandData) {
 /**
  * Unity 서버에서 웹 콘솔로 응답을 전달하는 함수
  */
-function relayResponseToWeb(event: string, data: unknown) {
+function relayResponseToWeb(event: string, data: any) {
 	// 모든 웹 콘솔 클라이언트에게 응답 전달
 	connectedClients.forEach((client) => {
 		if (client.clientType === 'web' && client.socket.connected) {
@@ -221,7 +227,7 @@ io.on('connection', (socket: Socket) => {
 		});
 
 		// Unity 서버에서 오는 이벤트들을 웹 콘솔로 전달
-		socket.on('command:response', (data) => {
+		socket.on('command:response', (data: UnityResponsePayload) => {
 			console.log(`[Relay] Unity → 웹: command:response`);
 			relayResponseToWeb('game:response', data);
 		});

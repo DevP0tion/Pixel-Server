@@ -11,6 +11,7 @@
 		handleWebCommand,
 		sendToServer
 	} from './command';
+	import type { UnityResponsePayload } from '../../hooks.server';
 
 	// 상태 (로그는 logStore에서 관리)
 	let logs: LogEntry[] = $state(logStore.logs);
@@ -200,7 +201,7 @@
 		// 명령어 응답 (로컬 처리)
 		addEventHandler(
 			'command:response',
-			(response: { code: number; message: string; data?: unknown }) => {
+			(response: { code: number; message: string; data?: any }) => {
 				const status = response.code === 100 ? '' : '✗';
 				// 메시지에 \n이 포함된 경우 여러 줄로 출력
 				const [firstLine, ...otherLines] = response.message.split('\n');
@@ -213,16 +214,16 @@
 		);
 
 		// Unity 서버에서 온 게임 응답
-		addEventHandler(
-			'game:response',
-			(response: { code: number; message: string; data?: unknown }) => {
-				const status = response.code === 100 ? '✓' : '✗';
-				addLog('game', `${status} ${response.message}`);
-				if (response.data) {
-					addLog('game', `  데이터: ${JSON.stringify(response.data)}`);
-				}
+		addEventHandler('game:response', (payload: string) => {
+			const response: UnityResponsePayload = JSON.parse(payload);
+			const status = response.code === 100 ? '✓' : '✗';
+			addLog('game', `${status} ${response.message}`);
+			console.log(response);
+			console.log(response.code);
+			if (response.data) {
+				addLog('game', `  데이터: ${response.data}`); // 데이터는 이미 직렬화된 문자열임
 			}
-		);
+		});
 
 		// Unity 서버에서 온 게임 로그
 		addEventHandler('game:log', (data: { message?: string }) => {
