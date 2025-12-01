@@ -205,9 +205,9 @@
 				const status = response.code === 100 ? '' : '✗';
 				// 메시지에 \n이 포함된 경우에도 그대로 저장 (렌더링 시 줄바꿈으로 표시)
 				addLog('socketio', `${status} ${response.message}`);
-				if (response.data) {
-					addLog('socketio', `  데이터: ${JSON.stringify(response.data)}`);
-				}
+				// if (response.data) {
+				// 	addLog('socketio', `  데이터: ${JSON.stringify(response.data)}`);
+				// }
 			}
 		);
 
@@ -215,24 +215,8 @@
 		addEventHandler('game:response', (payload: string) => {
 			const response: UnityResponsePayload = JSON.parse(payload);
 
-			switch (response.code) {
-				case 100:
-					addLog('game', `✓ ${response.message}`);
-					addLog('game', `  데이터: ${response.data}`); // 데이터는 이미 직렬화된 문자열임
-					break;
-				case 101:
-					// 메세지
-					break;
-				case 200:
-					// 경고
-					break;
-				case 300:
-					// 오류
-					break;
-				default:
-					addLog('game', `알 수 없는 코드: ${response.code} - ${response.message}`);
-					break;
-			}
+			const status = response.code === 100 ? '' : '✗';
+			addLog('game', `${status} ${response.message}`);
 		});
 
 		// Unity 서버에서 온 게임 로그
