@@ -44,15 +44,18 @@
 		})
 	);
 
+	// Unity 서버 기본 별칭
+	const DEFAULT_UNITY_ALIAS = 'Game Server';
+
 	/**
 	 * 서버 목록을 클라이언트용 형식으로 변환
 	 */
 	function formatUnityServerList(
-		servers: Array<{ id: string; connectedAt: string }>
+		servers: Array<{ id: string; connectedAt: string; alias?: string }>
 	): Array<{ id: string; name: string }> {
 		return servers.map((s) => ({
 			id: s.id,
-			name: `서버 ${s.id.substring(0, 8)}...`
+			name: s.alias || DEFAULT_UNITY_ALIAS
 		}));
 	}
 
@@ -116,7 +119,7 @@
 				clientId: string;
 				clientType: string;
 				unityConnected: boolean;
-				unityServers?: Array<{ id: string; connectedAt: string }>;
+				unityServers?: Array<{ id: string; connectedAt: string; alias?: string }>;
 			}) => {
 				addLog('socketio', `서버 메시지: ${data.message}`);
 				addLog('socketio', `클라이언트 ID: ${data.clientId}`);
@@ -141,7 +144,7 @@
 			(data: {
 				message: string;
 				unitySocketId?: string;
-				unityServers?: Array<{ id: string; connectedAt: string }>;
+				unityServers?: Array<{ id: string; connectedAt: string; alias?: string }>;
 			}) => {
 				isUnityConnected = true;
 				addLog('game', `✓ ${data.message}`);
@@ -158,7 +161,7 @@
 			(data: {
 				message: string;
 				unitySocketId?: string;
-				unityServers?: Array<{ id: string; connectedAt: string }>;
+				unityServers?: Array<{ id: string; connectedAt: string; alias?: string }>;
 			}) => {
 				// Unity 서버 목록 업데이트
 				if (data.unityServers) {
@@ -171,6 +174,21 @@
 				// 모든 Unity 서버가 연결 해제된 경우
 				isUnityConnected = connectedUnityServers.length > 0;
 				addLog('game', `✗ ${data.message}`);
+			}
+		);
+
+		// Unity 서버 별칭 변경 알림
+		addEventHandler(
+			'unity:alias-changed',
+			(data: {
+				unitySocketId: string;
+				alias: string;
+				unityServers?: Array<{ id: string; connectedAt: string; alias?: string }>;
+			}) => {
+				// Unity 서버 목록 업데이트
+				if (data.unityServers) {
+					connectedUnityServers = formatUnityServerList(data.unityServers);
+				}
 			}
 		);
 

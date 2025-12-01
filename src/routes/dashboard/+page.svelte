@@ -2,9 +2,16 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { socketManager, type UnityServerInfo } from '$lib/socket';
 
+	// Unity 서버 기본 별칭
+	const DEFAULT_UNITY_ALIAS = 'Game Server';
+
 	// 상태
 	let isConnected = $state(false);
 	let unityServers: UnityServerInfo[] = $state([]);
+
+	// 별칭 편집 상태
+	let editingServerId: string | null = $state(null);
+	let editingAlias = $state('');
 
 	// 이벤트 리스너 정리를 위한 배열
 	let eventCleanupFns: Array<() => void> = [];
@@ -60,11 +67,31 @@
 			}
 		});
 
+		// Unity 서버 별칭 변경 알림
+		addEventHandler('unity:alias-changed', (data: unknown) => {
+			const aliasData = data as { unityServers?: UnityServerInfo[] };
+			if (aliasData.unityServers) {
+				unityServers = aliasData.unityServers;
+			}
+		});
+
 		// Unity 서버 강제 연결 해제 응답
 		addEventHandler('unity:disconnect:response', (response: unknown) => {
 			const res = response as { code: number; message: string };
 			if (res.code === 100) {
 				console.log(res.message);
+			} else {
+				console.error(res.message);
+			}
+		});
+
+		// Unity 서버 별칭 변경 응답
+		addEventHandler('unity:set-alias:response', (response: unknown) => {
+			const res = response as { code: number; message: string };
+			if (res.code === 100) {
+				console.log(res.message);
+				editingServerId = null;
+				editingAlias = '';
 			} else {
 				console.error(res.message);
 			}
@@ -80,6 +107,37 @@
 	function disconnectUnityServer(unitySocketId: string) {
 		if (isConnected) {
 			socketManager.sendSocketEvent('unity:disconnect', { unitySocketId });
+		}
+	}
+
+	// 별칭 편집 시작
+	function startEditAlias(server: UnityServerInfo) {
+		editingServerId = server.id;
+		editingAlias = server.alias;
+	}
+
+	// 별칭 편집 취소
+	function cancelEditAlias() {
+		editingServerId = null;
+		editingAlias = '';
+	}
+
+	// 별칭 저장
+	function saveAlias(unitySocketId: string) {
+		if (isConnected) {
+			socketManager.sendSocketEvent('unity:set-alias', {
+				unitySocketId,
+				alias: editingAlias.trim() || DEFAULT_UNITY_ALIAS
+			});
+		}
+	}
+
+	// 별칭 편집 키보드 핸들러
+	function handleAliasKeydown(event: KeyboardEvent, serverId: string) {
+		if (event.key === 'Enter') {
+			saveAlias(serverId);
+		} else if (event.key === 'Escape') {
+			cancelEditAlias();
 		}
 	}
 
@@ -176,6 +234,40 @@
 					{#each unityServers as server (server.id)}
 						<div class="server-card">
 							<div class="server-info">
+								<div class="server-alias">
+									{#if editingServerId === server.id}
+										<input
+											type="text"
+											class="alias-input"
+											bind:value={editingAlias}
+											onkeydown={(e) => handleAliasKeydown(e, server.id)}
+											placeholder="Game Server"
+										/>
+										<button
+											class="btn btn-small btn-success"
+											onclick={() => saveAlias(server.id)}
+											title="저장"
+										>
+											✓
+										</button>
+										<button
+											class="btn btn-small btn-secondary"
+											onclick={cancelEditAlias}
+											title="취소"
+										>
+											✗
+										</button>
+									{:else}
+										<span class="alias-text">{server.alias}</span>
+										<button
+											class="btn btn-small btn-edit"
+											onclick={() => startEditAlias(server)}
+											title="별칭 편집"
+										>
+											✎
+										</button>
+									{/if}
+								</div>
 								<div class="server-id">
 									<span class="status-dot"></span>
 									<span class="id-text">{server.id}</span>
@@ -312,6 +404,38 @@
 		background-color: #c0392b;
 	}
 
+	.btn-success {
+		background-color: #27ae60;
+		color: white;
+	}
+
+	.btn-success:hover {
+		background-color: #219a52;
+	}
+
+	.btn-secondary {
+		background-color: #7f8c8d;
+		color: white;
+	}
+
+	.btn-secondary:hover {
+		background-color: #6c7a7d;
+	}
+
+	.btn-edit {
+		background-color: #9b59b6;
+		color: white;
+	}
+
+	.btn-edit:hover {
+		background-color: #8e44ad;
+	}
+
+	.btn-small {
+		padding: 4px 8px;
+		font-size: 0.75rem;
+	}
+
 	/* 메인 콘텐츠 */
 	.main-content {
 		flex: 1;
@@ -394,6 +518,41 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
+	}
+
+	.server-alias {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 4px;
+	}
+
+	.alias-text {
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #f39c12;
+	}
+
+	.alias-input {
+		padding: 4px 8px;
+		background-color: #0f3460;
+		border: 1px solid #3498db;
+		border-radius: 4px;
+		color: #f39c12;
+		font-size: 1rem;
+		font-weight: 600;
+		outline: none;
+		width: 200px;
+	}
+
+	.alias-input:focus {
+		border-color: #f39c12;
+		box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.2);
+	}
+
+	.alias-input::placeholder {
+		color: #7f8c8d;
+		font-weight: 400;
 	}
 
 	.server-id {

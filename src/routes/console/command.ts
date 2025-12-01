@@ -155,7 +155,9 @@ export function sendToServer(
 			selectedUnityServer === 'all' ? args : { ...args, targetUnityId: selectedUnityServer };
 		socketManager.sendSocketEvent('unity:command', { cmd, args: commandArgs });
 		const serverInfo =
-			selectedUnityServer === 'all' ? '모든 Unity 서버' : `Unity 서버 (${selectedUnityServer.substring(0, 8)}...)`;
+			selectedUnityServer === 'all'
+				? '모든 Unity 서버'
+				: `Unity 서버 (${selectedUnityServer.substring(0, 8)}...)`;
 		addLog('socketio', `${serverInfo}로 명령어 전송: ${cmd}`);
 	}
 
