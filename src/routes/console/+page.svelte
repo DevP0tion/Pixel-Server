@@ -11,7 +11,7 @@
 		handleWebCommand,
 		sendToServer
 	} from './command';
-	import type { UnityResponsePayload } from '../../hooks.server';
+	import type { UnityResponsePayload } from '$lib/server/socketIO';
 
 	// 상태 (로그는 logStore에서 관리)
 	let logs: LogEntry[] = $state(logStore.logs);
