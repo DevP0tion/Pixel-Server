@@ -1,4 +1,4 @@
-import { firebaseAuth as auth } from "../../../hooks.server.js"
+import { firebaseAuth as auth } from "../../../hooks.server"
 
 export async function POST({ request }) {
   // Registration logic will go here
@@ -11,6 +11,8 @@ export async function POST({ request }) {
     });
 
     const token = await auth.createCustomToken(user.uid);
+
+    
 
     return new Response(JSON.stringify({ 
       message: "User created successfully",
