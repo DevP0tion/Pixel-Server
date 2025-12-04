@@ -89,6 +89,7 @@
 	// 소켓 이벤트 핸들러 등록
 	function setupSocketEventHandlers() {
 		// 이벤트 리스너 헬퍼 함수
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		function addEventHandler(event: string, handler: (...args: any[]) => void) {
 			socketManager.on(event, handler);
 			eventCleanupFns.push(() => socketManager.off(event, handler));
@@ -201,6 +202,7 @@
 		// 명령어 응답 (로컬 처리)
 		addEventHandler(
 			'command:response',
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			(response: { code: number; message: string; data?: any }) => {
 				const status = response.code === 100 ? '' : '✗';
 				// 메시지에 \n이 포함된 경우에도 그대로 저장 (렌더링 시 줄바꿈으로 표시)
@@ -388,7 +390,7 @@
 				</select>
 				{#if commandTarget === 'unity'}
 					<select bind:value={selectedUnityServer} class="unity-server-dropdown">
-						{#each unityServerOptions as server}
+						{#each unityServerOptions as server (server.id)}
 							<option value={server.id}>{server.name}</option>
 						{/each}
 					</select>

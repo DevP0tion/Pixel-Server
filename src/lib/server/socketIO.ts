@@ -17,6 +17,7 @@ interface UnityServerInfo {
 export interface UnityResponsePayload {
 	code: number;
 	message: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	data: any;
 }
 
@@ -59,7 +60,8 @@ function getUnityServerList(
  */
 function formatUnityPayload(data: CommandData): UnityCommandPayload {
 	// args에서 targetUnityId 제거 후 data로 변환
-	const { targetUnityId: _, ...restArgs } = data.args ?? {};
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { targetUnityId: _targetUnityId, ...restArgs } = data.args ?? {};
 
 	return {
 		cmd: data.cmd,
@@ -152,6 +154,7 @@ function relayCommandToUnity(
  */
 function relayResponseToWeb(
 	event: string,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	data: any,
 	connectedClients: Map<string, ConnectedClient>
 ) {
@@ -233,11 +236,20 @@ export function startSocketServer(port: number = 7777) {
 			console.log(`[Unity] Unity 서버가 연결되었습니다. (총 ${unityServers.size}개)`);
 
 			// 모든 웹 콘솔에 Unity 서버 연결 알림
-			relayResponseToWeb('unity:connected', {
-				message: 'Unity 서버가 연결되었습니다.',
-				unitySocketId: socket.id,
-				unityServers: getUnityServerList(unityServers, connectedClients, unityServerAliases, DEFAULT_UNITY_ALIAS)
-			}, connectedClients);
+			relayResponseToWeb(
+				'unity:connected',
+				{
+					message: 'Unity 서버가 연결되었습니다.',
+					unitySocketId: socket.id,
+					unityServers: getUnityServerList(
+						unityServers,
+						connectedClients,
+						unityServerAliases,
+						DEFAULT_UNITY_ALIAS
+					)
+				},
+				connectedClients
+			);
 
 			// Unity 서버에서 오는 이벤트들을 웹 콘솔로 전달
 			socket.on('command:response', (data: UnityResponsePayload) => {
@@ -286,7 +298,12 @@ export function startSocketServer(port: number = 7777) {
 		// Unity 서버 목록 요청 핸들러
 		socket.on('unity:list', () => {
 			socket.emit('unity:list', {
-				unityServers: getUnityServerList(unityServers, connectedClients, unityServerAliases, DEFAULT_UNITY_ALIAS)
+				unityServers: getUnityServerList(
+					unityServers,
+					connectedClients,
+					unityServerAliases,
+					DEFAULT_UNITY_ALIAS
+				)
 			});
 		});
 
@@ -325,11 +342,20 @@ export function startSocketServer(port: number = 7777) {
 			});
 
 			// 모든 웹 클라이언트에 별칭 변경 알림
-			relayResponseToWeb('unity:alias-changed', {
-				unitySocketId: data.unitySocketId,
-				alias: newAlias,
-				unityServers: getUnityServerList(unityServers, connectedClients, unityServerAliases, DEFAULT_UNITY_ALIAS)
-			}, connectedClients);
+			relayResponseToWeb(
+				'unity:alias-changed',
+				{
+					unitySocketId: data.unitySocketId,
+					alias: newAlias,
+					unityServers: getUnityServerList(
+						unityServers,
+						connectedClients,
+						unityServerAliases,
+						DEFAULT_UNITY_ALIAS
+					)
+				},
+				connectedClients
+			);
 		});
 
 		// Unity 서버 강제 연결 해제 요청 핸들러
@@ -372,14 +398,25 @@ export function startSocketServer(port: number = 7777) {
 			if (client?.clientType === 'unity' && unityServers.has(socket.id)) {
 				unityServers.delete(socket.id);
 				unityServerAliases.delete(socket.id);
-				console.log(`[Unity] Unity 서버 연결이 해제되었습니다. (남은 서버: ${unityServers.size}개)`);
+				console.log(
+					`[Unity] Unity 서버 연결이 해제되었습니다. (남은 서버: ${unityServers.size}개)`
+				);
 
 				// 모든 웹 콘솔에 Unity 서버 연결 해제 알림
-				relayResponseToWeb('unity:disconnected', {
-					message: 'Unity 서버 연결이 해제되었습니다.',
-					unitySocketId: socket.id,
-					unityServers: getUnityServerList(unityServers, connectedClients, unityServerAliases, DEFAULT_UNITY_ALIAS)
-				}, connectedClients);
+				relayResponseToWeb(
+					'unity:disconnected',
+					{
+						message: 'Unity 서버 연결이 해제되었습니다.',
+						unitySocketId: socket.id,
+						unityServers: getUnityServerList(
+							unityServers,
+							connectedClients,
+							unityServerAliases,
+							DEFAULT_UNITY_ALIAS
+						)
+					},
+					connectedClients
+				);
 			}
 
 			connectedClients.delete(socket.id);
@@ -391,7 +428,12 @@ export function startSocketServer(port: number = 7777) {
 			clientId: socket.id,
 			clientType,
 			unityConnected: unityServers.size > 0,
-			unityServers: getUnityServerList(unityServers, connectedClients, unityServerAliases, DEFAULT_UNITY_ALIAS),
+			unityServers: getUnityServerList(
+				unityServers,
+				connectedClients,
+				unityServerAliases,
+				DEFAULT_UNITY_ALIAS
+			),
 			serverTime: new Date().toISOString()
 		});
 	});

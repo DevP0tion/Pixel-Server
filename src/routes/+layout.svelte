@@ -10,9 +10,9 @@
 
 	// Navigation items - resolve routes in advance
 	const navItems = [
-		{ path: '/', href: resolveRoute('/', {}), label: 'Home', icon: '🏠' },
-		{ path: '/console', href: resolveRoute('/console', {}), label: 'Console', icon: '💻' },
-		{ path: '/dashboard', href: resolveRoute('/dashboard', {}), label: 'Dashboard', icon: '📊' }
+		{ path: '/', href: resolveRoute('/'), label: 'Home', icon: '🏠' },
+		{ path: '/console', href: resolveRoute('/console'), label: 'Console', icon: '💻' },
+		{ path: '/dashboard', href: resolveRoute('/dashboard'), label: 'Dashboard', icon: '📊' }
 	];
 
 	function toggleDrawer() {

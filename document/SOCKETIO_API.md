@@ -339,7 +339,7 @@ Unity 서버의 별칭을 변경합니다. (웹 클라이언트만 가능)
 // 페이로드
 {
 	unitySocketId: string; // 별칭을 변경할 Unity 서버 ID
-	alias: string;         // 새 별칭 (빈 문자열이면 'Game Server'로 설정)
+	alias: string; // 새 별칭 (빈 문자열이면 'Game Server'로 설정)
 }
 ```
 
