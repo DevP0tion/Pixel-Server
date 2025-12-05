@@ -158,11 +158,7 @@ class SocketManager extends EventEmitter {
 			'game:response',
 			'game:log',
 			'game:event',
-			'auth:response',
-			'player:move',
-			'bullet:spawn',
 			'player:leave',
-			'broadcast',
 			'unity:disconnect:response',
 			'unity:set-alias:response'
 		];

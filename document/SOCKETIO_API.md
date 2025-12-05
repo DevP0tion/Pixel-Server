@@ -352,14 +352,14 @@ Unity 서버의 별칭을 변경합니다. (웹 클라이언트만 가능)
 
 ## 명령어 시스템
 
-### 등록된 명령어
+### Svelte 서버 등록 명령어
 
-| 명령어        | 설명                       | 응답 이벤트        |
-| ------------- | -------------------------- | ------------------ |
-| `ping`        | 서버 연결 확인 (pong 응답) | `command:response` |
-| `status`      | 서버 상태 조회             | `command:response` |
-| `help`        | 사용 가능한 명령어 목록    | `command:response` |
-| `server:info` | 서버 상세 정보 조회        | `command:response` |
+| 명령어        | 설명                       | 응답 이벤트        | 예제 |
+| ------------- | -------------------------- | ------------------ | ---- |
+| `ping`        | 서버 연결 확인 (pong 응답) | `command:response` | `ping` |
+| `status`      | 서버 상태 조회 (연결된 클라이언트 수, 서버 시간) | `command:response` | `status` |
+| `help`        | 사용 가능한 명령어 목록    | `command:response` | `help` |
+| `server:info` | 서버 상세 정보 조회 (버전, 가동시간, 메모리 등) | `command:response` | `server:info` |
 
 ### 명령어 데이터 형식
 
@@ -380,16 +380,59 @@ interface CommandResponse {
 }
 ```
 
+### Svelte 서버에 커스텀 명령어 추가
+
+`src/lib/server/commands.ts` 파일에서 커스텀 명령어를 추가할 수 있습니다:
+
+```typescript
+import type { SocketCommandHandler } from './SocketCommandHandler.js';
+
+export function loadCommands(
+	commandHandler: SocketCommandHandler,
+	connectedClients: Map<string, ConnectedClient>
+) {
+	// 기존 명령어들...
+	
+	// 커스텀 명령어 추가
+	commandHandler.registerCommand('custom:hello', (socket, args) => {
+		const name = args?.name || 'World';
+		socket.emit('command:response', {
+			code: 100,
+			message: `Hello, ${name}!`,
+			data: { timestamp: new Date().toISOString() }
+		});
+	});
+	
+	commandHandler.registerCommand('custom:stats', (socket, args) => {
+		// 통계 정보 반환
+		socket.emit('command:response', {
+			code: 100,
+			message: '서버 통계',
+			data: {
+				totalClients: connectedClients.size,
+				uptime: process.uptime()
+			}
+		});
+	});
+}
+```
+
 ### 명령어 실행 예제
 
 ```typescript
 // ping 명령어
 socket.emit('svelte:command', { cmd: 'ping' });
 
+// 인자가 있는 명령어
+socket.emit('svelte:command', { 
+	cmd: 'custom:hello', 
+	args: { name: 'Alice' } 
+});
+
 // 결과 수신
 socket.on('command:response', (response) => {
 	console.log(response);
-	// { code: 100, message: 'pong', data: { timestamp: 1234567890 } }
+	// { code: 100, message: 'Hello, Alice!', data: { timestamp: '...' } }
 });
 ```
 
@@ -431,27 +474,6 @@ interface AuthResponseMessage {
 }
 ```
 
-### MovePacket
-
-```typescript
-interface MovePacket {
-	direction: { x: number; y: number };
-	canceled: boolean;
-}
-```
-
-### BulletPacket
-
-```typescript
-interface BulletPacket {
-	typeName: string;
-	teamName: string;
-	startPos: { x: number; y: number; z: number };
-	targetPos: { x: number; y: number; z: number };
-	damage: number;
-}
-```
-
 ---
 
 ## 응답 코드
@@ -459,9 +481,12 @@ interface BulletPacket {
 | 코드  | 설명                                                      |
 | ----- | --------------------------------------------------------- |
 | `100` | 성공                                                      |
+| `101` | 일반 메시지 (정보 전달용)                                  |
 | `403` | 권한 없음                                                 |
 | `404` | 리소스를 찾을 수 없음 (명령어 미등록, Unity 서버 없음 등) |
 | `503` | 서비스 이용 불가 (Unity 서버 연결 안됨)                   |
+
+> **참고**: Unity의 `CommandResponse` 클래스는 `Success()`, `Message()`, `Error()` 헬퍼 메서드를 제공합니다.
 
 ---
 
@@ -499,6 +524,56 @@ socket.on('unity:disconnected', (data) => {
 });
 ```
 
+### Unity 클라이언트 연결 (C#)
+
+```csharp
+using SocketIOClient;
+using Newtonsoft.Json.Linq;
+
+public class NetworkManager : MonoBehaviour
+{
+    private SocketIOUnity socket;
+    
+    void Start()
+    {
+        var uri = new Uri("http://localhost:7777");
+        socket = new SocketIOUnity(uri, new SocketIOOptions
+        {
+            Query = new Dictionary<string, string>
+            {
+                {"clientType", "unity"}
+            },
+            Transport = SocketIOClient.Transport.TransportProtocol.WebSocket
+        });
+        
+        // 환영 메시지 수신
+        socket.On("welcome", response =>
+        {
+            var data = response.GetValue<JObject>();
+            Debug.Log($"Connected: {data["message"]}");
+        });
+        
+        // 명령어 수신
+        socket.On("unity:command", response =>
+        {
+            var commandData = response.GetValue<CommandData>();
+            HandleCommand(commandData);
+        });
+        
+        socket.Connect();
+    }
+    
+    void HandleCommand(CommandData data)
+    {
+        Debug.Log($"Command received: {data.cmd}");
+        
+        // 명령어 처리 후 응답
+        var response = new CommandResponse(100, "Success", JToken.FromObject(new { result = "ok" }));
+        socket.Emit("command:response", response);
+    }
+}
+```
+
 ### 명령어 전송 (Svelte 서버)
 
 ```typescript
@@ -507,6 +582,9 @@ socket.emit('svelte:command', { cmd: 'status' });
 
 // 서버 정보 조회
 socket.emit('svelte:command', { cmd: 'server:info' });
+
+// 도움말
+socket.emit('svelte:command', { cmd: 'help' });
 
 // 응답 수신
 socket.on('command:response', (response) => {
@@ -518,6 +596,50 @@ socket.on('command:response', (response) => {
 	}
 });
 ```
+
+### Unity에서 커스텀 명령어 등록
+
+```csharp
+using PixelCollector.Networking.Server;
+
+public class MyGameCommands : MonoBehaviour
+{
+    private SocketCommandHandler commandHandler;
+    
+    void Start()
+    {
+        commandHandler = GetComponent<SocketCommandHandler>();
+        
+        // 커스텀 명령어 등록
+        commandHandler.RegisterCommand("game:pause", "게임을 일시정지합니다", HandlePauseCommand);
+        commandHandler.RegisterCommand("player:count", "플레이어 수를 반환합니다", HandlePlayerCount);
+        commandHandler.RegisterCommand("server:restart", "서버를 재시작합니다", HandleServerRestart);
+    }
+    
+    CommandResponse HandlePauseCommand(SocketIOUnity socket, CommandData args)
+    {
+        // 게임 일시정지 로직
+        Time.timeScale = 0;
+        
+        return CommandResponse.Success("게임이 일시정지되었습니다");
+    }
+    
+    CommandResponse HandlePlayerCount(SocketIOUnity socket, CommandData args)
+    {
+        int count = NetworkServer.connections.Count;
+        
+        return CommandResponse.Success("플레이어 수 조회 성공", 
+            JToken.FromObject(new { playerCount = count }));
+    }
+    
+    CommandResponse HandleServerRestart(SocketIOUnity socket, CommandData args)
+    {
+        // 재시작 로직
+        StartCoroutine(RestartServer());
+        
+        return CommandResponse.Success("서버 재시작을 시작합니다");
+    }
+}
 
 ### Unity 서버로 명령어 전송
 
@@ -540,7 +662,30 @@ socket.emit('unity:command', {
 // 전달 확인
 socket.on('command:relayed', (response) => {
 	console.log('명령어 전달됨:', response.targetUnityIds);
+	console.log('전달된 데이터:', response.data);
 });
+
+// Unity 서버로부터의 응답 수신
+socket.on('game:response', (response) => {
+	console.log('Unity 응답:', response);
+});
+```
+
+### Unity에서 명령어 응답 전송
+
+```csharp
+// 성공 응답
+var response = CommandResponse.Success("작업 완료", 
+    JToken.FromObject(new { result = "ok", timestamp = DateTime.Now }));
+socket.Emit("command:response", response);
+
+// 메시지 응답 (정보 전달)
+var message = CommandResponse.Message("서버 상태: 정상", "플레이어 수: 10명");
+socket.Emit("command:response", message);
+
+// 에러 응답
+var error = CommandResponse.Error(404, "플레이어를 찾을 수 없습니다");
+socket.Emit("command:response", error);
 ```
 
 ### Unity 서버 목록 조회
@@ -665,10 +810,48 @@ socketManager.disconnect();
 - `game:log`
 - `game:event`
 
+### Unity 명령어 형식
+
+Unity에서 수신하는 명령어 형식은 다음과 같습니다:
+
+```json
+{
+  "cmd": "명령어이름",
+  "data": {
+    "key1": "value1",
+    "key2": "value2"
+  }
+}
+```
+
+웹 콘솔에서 `unity:command` 이벤트로 전송할 때, `args.targetUnityId`는 자동으로 제거되고 나머지 인자만 `data`로 전달됩니다.
+
+### 웹 콘솔 명령어 파싱
+
+웹 콘솔(`/console` 페이지)에서는 다음 형식으로 명령어를 입력할 수 있습니다:
+
+```bash
+# 기본 형식
+commandName
+
+# JSON 인자 형식
+commandName {"key": "value", "number": 123}
+
+# key=value 형식
+commandName key1=value1 key2=123 key3=true
+```
+
+### Firebase 인증 통합
+
+Unity 클라이언트는 Firebase 인증 토큰을 전송하여 사용자를 검증할 수 있습니다. 자세한 내용은 `AuthPacket` 타입을 참조하세요.
+
 ---
 
 ## 버전 정보
 
 - **서버 버전**: 1.0.0
 - **Socket.IO 버전**: 4.8.1
-- **문서 최종 업데이트**: 2024년
+- **지원 클라이언트**: 
+  - Unity (SocketIOClient for Unity)
+  - 웹 브라우저 (socket.io-client 4.x)
+- **문서 최종 업데이트**: 2025년 12월

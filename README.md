@@ -30,8 +30,6 @@ Pixel-Collector 게임에서 처리하는 주요 기능:
 | 기능 | 설명 | 관련 패킷 |
 |------|------|----------|
 | 인증 | Firebase 기반 사용자 인증 | `AuthPacket`, `AuthResponseMessage` |
-| 이동 | 플레이어 이동 처리 | `MovePacket` |
-| 전투 | 총알/공격 시스템 | `BulletPacket` |
 | 명령어 | 게임 서버 명령어 실행 | `CommandData`, `CommandResponse` |
 
 ## 서버 로직 (Server Logic)
@@ -54,19 +52,47 @@ Pixel-Collector 게임에서 처리하는 주요 기능:
 - Firebase Admin SDK 초기화
 - 사용자 인증 토큰 검증
 
-## 클라이언트 연결 흐름
+## 시스템 아키텍처
 
 ```
-┌──────────────┐     Socket.IO      ┌──────────────┐
-│   Unity      │ ◄──────────────►   │              │
-│   (게임서버)  │   clientType:unity │              │
-└──────────────┘                    │  Pixel-      │
-                                    │  Server      │
-┌──────────────┐     Socket.IO      │  (백엔드)    │
-│  웹 콘솔     │ ◄──────────────►   │              │
-│  (관리도구)   │   clientType:web   │              │
-└──────────────┘                    └──────────────┘
+┌──────────────┐           ┌──────────────┐           ┌──────────────┐
+│   MySQL      │◄─────────►│   Svelte     │◄─────────►│   Firebase   │
+│   Database   │  데이터 조회│  + SocketIO  │  인증 검증 │   인증서버    │
+└──────────────┘  데이터 저장│   Server     │  사용자 관리│              │
+                            │  + Firebase  │           └──────────────┘
+                            │    Admin     │
+                            └──────┬───────┘
+                                   │
+                  ┌────────────────┼────────────────┐
+                  │                │                │
+                  ▼                ▼                ▼
+          ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+          │    Unity     │ │    Svelte    │ │    Unity     │
+          │  dedicated   │ │   웹 콘솔     │ │     게임     │
+          │  게임 서버    │ │  + SocketIO  │ │  클라이언트   │
+          │  + SocketIO  │ │    Client    │ │              │
+          │    Client    │ └──────────────┘ └──────────────┘
+          └──────┬───────┘         │                │
+                 │                 │                │
+                 └─────────────────┼────────────────┘
+                         게임 로직 ◄┘
 ```
+
+### 데이터 흐름
+
+1. **인증 흐름**
+   - Unity 게임 서버 → Svelte 서버: 유저 로그인 토큰 전송
+   - Svelte 서버 → Unity 게임 서버: 유저 데이터 및 인증정보 응답
+   - Unity 게임 클라이언트 → Unity 게임 서버: 로그인 토큰 전송
+
+2. **웹 콘솔 명령어 흐름**
+   - 웹 콘솔 → Svelte 서버: 명령어 전송
+   - Svelte 서버 → Unity 게임 서버: 웹 콘솔 명령어 전달
+   - Unity 게임 서버 → Svelte 서버: 응답, 알림, 상태 전송
+   - Svelte 서버 → 웹 콘솔: 서버 상태, 알림, 응답 전달
+
+3. **게임 로직 흐름**
+   - Unity 게임 클라이언트 ↔ Unity 게임 서버: 게임 로직 처리
 
 ## 이벤트 목록
 
@@ -110,7 +136,7 @@ cp .example.env .env
 ### 환경 변수
 
 ```env
-# MySQL 설정
+# 예시 MySQL 설정
 mysql_address=localhost
 mysql_port=3306
 mysql_user=root
@@ -140,4 +166,4 @@ yarn preview
 
 ## 라이선스
 
-Private
+MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
