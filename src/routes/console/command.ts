@@ -92,7 +92,7 @@ export function handleWebCommand(
 	getConnectionStatus: () => {
 		isConnected: boolean;
 		isUnityConnected: boolean;
-		commandTarget: string;
+		commandTarget: 'unity' | 'socketIO' | 'web';
 	}
 ) {
 	const parts = input.split(' ');
@@ -126,13 +126,13 @@ export function handleWebCommand(
 /**
  * 서버로 명령어 전송
  * @param parsedCommand 파싱된 명령어
- * @param commandTarget 명령어 대상 (unity, svelte)
+ * @param commandTarget 명령어 대상 (unity, socketIO)
  * @param selectedUnityServer 선택된 Unity 서버 ID
  * @param isConnected 연결 상태
  */
 export function sendToServer(
 	parsedCommand: ParsedCommand,
-	commandTarget: 'unity' | 'svelte',
+	commandTarget: 'unity' | 'socketIO',
 	selectedUnityServer: string,
 	isConnected: boolean
 ): boolean {
@@ -144,16 +144,16 @@ export function sendToServer(
 
 	const { cmd, args } = parsedCommand;
 
-	if (commandTarget === 'svelte') {
-		// Svelte 서버 명령어 (svelte:command 이벤트로 전송)
-		socketManager.sendSocketEvent('svelte:command', { cmd, args });
-		addLog('socketio', `Svelte 서버 명령어: ${cmd}`);
+	if (commandTarget === 'socketIO') {
+		// SocketIO 서버 명령어 (target 속성을 포함해 단일 엔드포인트로 전달)
+		socketManager.sendSocketEvent('unity:command', { target: 'socketIO', cmd, args });
+		addLog('socketio', `SocketIO 서버 명령어: ${cmd}`);
 	} else {
 		// Unity 서버 명령어 (unity:command 이벤트로 전송)
 		// targetUnityId를 args 안에 포함시켜서 전송
 		const commandArgs =
 			selectedUnityServer === 'all' ? args : { ...args, targetUnityId: selectedUnityServer };
-		socketManager.sendSocketEvent('unity:command', { cmd, args: commandArgs });
+		socketManager.sendSocketEvent('unity:command', { target: 'unity', cmd, args: commandArgs });
 		const serverInfo =
 			selectedUnityServer === 'all'
 				? '모든 Unity 서버'

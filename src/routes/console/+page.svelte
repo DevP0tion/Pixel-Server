@@ -20,7 +20,7 @@
 	let isUnityConnected = $state(false);
 	let logContainer: HTMLDivElement | null = $state(null);
 	let autoScroll = $state(true);
-	let commandTarget: 'unity' | 'svelte' | 'web' = $state('unity');
+	let commandTarget: 'unity' | 'socketIO' | 'web' = $state('unity');
 	let selectedUnityServer = $state('all'); // 'all' 또는 특정 서버 ID
 	let connectedUnityServers: Array<{ id: string; name: string }> = $state([]);
 
@@ -385,7 +385,7 @@
 			<div class="target-selector">
 				<select bind:value={commandTarget} class="target-dropdown">
 					<option value="unity">Unity</option>
-					<option value="svelte">Svelte</option>
+					<option value="socketIO">SocketIO</option>
 					<option value="web">웹 콘솔</option>
 				</select>
 				{#if commandTarget === 'unity'}
@@ -403,8 +403,8 @@
 				onkeydown={handleKeydown}
 				placeholder={commandTarget === 'web'
 					? '웹 콘솔 명령어 입력... (help, clear, status 등)'
-					: commandTarget === 'svelte'
-						? 'Svelte 서버 명령어 입력...'
+					: commandTarget === 'socketIO'
+						? 'SocketIO 서버 명령어 입력...'
 						: 'Unity 서버 명령어 입력...'}
 				class="command-input"
 			/>

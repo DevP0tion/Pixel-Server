@@ -1,6 +1,7 @@
 // Types
 export type {
 	CommandData,
+	CommandTarget,
 	CommandResponse,
 	AuthPacket,
 	AuthResponseMessage,

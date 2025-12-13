@@ -4,8 +4,12 @@ import type { Socket } from 'socket.io';
  * 명령어 데이터 형식 (Pixel-Collector 프로젝트와 동일)
  * Command data format: {cmd: string, args: {}}
  */
+export type CommandTarget = 'unity' | 'socketIO';
+
 export interface CommandData {
 	cmd: string;
+	// 명령을 전달할 대상 (미지정 시 기본 라우팅 규칙 적용)
+	target?: CommandTarget;
 	args?: Record<string, unknown>;
 }
 

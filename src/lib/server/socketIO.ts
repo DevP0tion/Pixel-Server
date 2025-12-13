@@ -1,6 +1,7 @@
 import { Server, type Socket } from 'socket.io';
 import {
 	type CommandData,
+	type CommandTarget,
 	type ConnectedClient,
 	type ClientType,
 	SocketCommandHandler
@@ -218,6 +219,17 @@ function relayResponseToWeb(
 }
 
 /**
+ * 명령어 타겟 결정 (기본값: 웹 → Unity, Unity → SocketIO)
+ */
+function resolveCommandTarget(data: CommandData, clientType?: ClientType): CommandTarget {
+	if (data.target === 'unity' || data.target === 'socketIO') {
+		return data.target;
+	}
+
+	return clientType === 'unity' ? 'socketIO' : 'unity';
+}
+
+/**
  * Socket.IO 서버 시작
  */
 export function startSocketServer(port: number = 7777) {
@@ -336,14 +348,38 @@ export function startSocketServer(port: number = 7777) {
 			commandHandler.handleCommand(socket, data);
 		});
 
-		// Unity 서버 명령어 이벤트 핸들러
+		// 명령어 라우팅 이벤트 핸들러 (target에 따라 Unity 또는 SocketIO 처리)
 		socket.on('unity:command', (data: CommandData) => {
+			if (!data) {
+				socket.emit('command:response', {
+					code: 400,
+					message: '명령어 데이터가 비어있습니다.'
+				});
+				return;
+			}
+
 			const client = connectedClients.get(socket.id);
+			const target = resolveCommandTarget(data, client?.clientType);
 
 			if (client?.clientType === 'web') {
-				console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
-				// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
-				relayCommandToUnity(socket, data, unityServers);
+				if (target === 'unity') {
+					console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
+					// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
+					relayCommandToUnity(socket, data, unityServers);
+					return;
+				}
+
+				if (target === 'socketIO') {
+					console.log(`[Command] unity:command 수신 (웹 → SocketIO): ${data.cmd}`);
+					// SocketIO 서버에서 처리
+					commandHandler.handleCommand(socket, data);
+					return;
+				}
+
+				socket.emit('command:response', {
+					code: 400,
+					message: `지원하지 않는 명령 대상입니다: ${String(data.target)}`
+				});
 			} else if (client?.clientType === 'unity') {
 				console.log(`[Command] unity:command 수신 (Unity): ${data.cmd}`);
 				// Unity 서버에서 온 명령어 → 직접 처리
