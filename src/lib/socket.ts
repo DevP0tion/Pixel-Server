@@ -5,18 +5,27 @@
 import { io, type Socket } from 'socket.io-client';
 import EventEmitter from 'eventemitter3';
 
-// 소켓 상태 타입
-export interface SocketState {
-	isConnected: boolean;
-	isUnityConnected: boolean;
-	clientId: string | null;
-}
-
 // Unity 서버 정보 인터페이스
 export interface UnityServerInfo {
 	id: string;
 	connectedAt: string;
 	alias: string;
+}
+
+// Zone 정보 인터페이스
+export interface ZoneInfo {
+	name: string;
+	playerCount: number;
+	maxPlayers: number;
+	status: string;
+}
+
+// 소켓 상태 타입
+export interface SocketState {
+	isConnected: boolean;
+	isUnityConnected: boolean;
+	clientId: string | null;
+	zones: ZoneInfo[];
 }
 
 // 소켓 관리자 클래스
@@ -26,6 +35,7 @@ class SocketManager extends EventEmitter {
 	private _isUnityConnected = false;
 	private _clientId: string | null = null;
 	private _unityServers: UnityServerInfo[] = [];
+	private _zones: ZoneInfo[] = [];
 
 	// 상태 getter
 	get isConnected(): boolean {
@@ -42,6 +52,10 @@ class SocketManager extends EventEmitter {
 
 	get unityServers(): UnityServerInfo[] {
 		return this._unityServers;
+	}
+
+	get zones(): ZoneInfo[] {
+		return this._zones;
 	}
 
 	// 소켓 인스턴스 getter
@@ -151,6 +165,15 @@ class SocketManager extends EventEmitter {
 			this.emit('stateChange', this.getState());
 		});
 
+		// Zones 목록 응답
+		this.socket.on('zones:list', (data) => {
+			if (data.zones) {
+				this._zones = data.zones;
+			}
+			this.emit('zones:list', data);
+			this.emit('stateChange', this.getState());
+		});
+
 		// 기타 이벤트들 - 페이지에서 직접 구독할 수 있도록 전달
 		const forwardEvents = [
 			'command:relayed',
@@ -175,7 +198,8 @@ class SocketManager extends EventEmitter {
 		return {
 			isConnected: this._isConnected,
 			isUnityConnected: this._isUnityConnected,
-			clientId: this._clientId
+			clientId: this._clientId,
+			zones: this._zones
 		};
 	}
 
@@ -209,6 +233,7 @@ class SocketManager extends EventEmitter {
 		this._isUnityConnected = false;
 		this._clientId = null;
 		this._unityServers = [];
+		this._zones = [];
 	}
 }
 

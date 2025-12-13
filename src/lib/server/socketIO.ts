@@ -70,6 +70,57 @@ function formatUnityPayload(data: CommandData): UnityCommandPayload {
 }
 
 /**
+ * Unity 서버 선택 및 이벤트 전송 헬퍼 함수
+ * @param webSocket 웹 콘솔 소켓
+ * @param eventName 전송할 이벤트 이름
+ * @param targetUnityId 특정 Unity 서버 ID (선택)
+ * @param payload 전송할 데이터
+ * @param unityServers Unity 서버 맵
+ * @param errorEmptyDataKey 데이터가 없을 때 응답에 포함할 키
+ */
+function relayToUnityServer(
+	webSocket: Socket,
+	eventName: string,
+	targetUnityId: string | undefined,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	payload: any,
+	unityServers: Map<string, Socket>,
+	errorEmptyDataKey: string
+) {
+	if (targetUnityId) {
+		// 특정 Unity 서버에 요청
+		const unitySocket = unityServers.get(targetUnityId);
+		if (!unitySocket || !unitySocket.connected) {
+			webSocket.emit(eventName, {
+				code: 404,
+				message: `Unity 서버를 찾을 수 없습니다: ${targetUnityId}`,
+				[errorEmptyDataKey]: []
+			});
+			return;
+		}
+		unitySocket.emit(eventName, payload);
+	} else if (unityServers.size > 0) {
+		// 첫 번째 Unity 서버에 요청
+		const firstUnitySocket = Array.from(unityServers.values())[0];
+		if (firstUnitySocket && firstUnitySocket.connected) {
+			firstUnitySocket.emit(eventName, payload);
+		} else {
+			webSocket.emit(eventName, {
+				code: 503,
+				message: 'Unity 서버가 연결되어 있지 않습니다.',
+				[errorEmptyDataKey]: []
+			});
+		}
+	} else {
+		webSocket.emit(eventName, {
+			code: 503,
+			message: 'Unity 서버가 연결되어 있지 않습니다.',
+			[errorEmptyDataKey]: []
+		});
+	}
+}
+
+/**
  * Unity 서버로 명령어를 전달하는 함수
  * @param webSocket 웹 콘솔 소켓 (응답을 받을 소켓)
  * @param data 명령어 데이터 (args.targetUnityId로 특정 Unity 서버 지정, 없으면 모든 서버로 전송)
@@ -271,6 +322,11 @@ export function startSocketServer(port: number = 7777) {
 				console.log(`[Relay] Unity → 웹: game:event`);
 				relayResponseToWeb('game:event', data, connectedClients);
 			});
+
+			socket.on('zones:list', (data) => {
+				console.log(`[Relay] Unity → 웹: zones:list`);
+				relayResponseToWeb('zones:list', data, connectedClients);
+			});
 		}
 
 		// Svelte 서버 명령어 이벤트 핸들러
@@ -305,6 +361,11 @@ export function startSocketServer(port: number = 7777) {
 					DEFAULT_UNITY_ALIAS
 				)
 			});
+		});
+
+		// Zones 목록 요청 핸들러
+		socket.on('zones:list', (data: { targetUnityId?: string } = {}) => {
+			relayToUnityServer(socket, 'zones:list', data.targetUnityId, {}, unityServers, 'zones');
 		});
 
 		// Unity 서버 별칭 변경 핸들러

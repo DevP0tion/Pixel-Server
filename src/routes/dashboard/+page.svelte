@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { socketManager, type UnityServerInfo } from '$lib/socket';
 
 	// Unity 서버 기본 별칭
@@ -96,6 +97,7 @@
 				console.error(res.message);
 			}
 		});
+
 	}
 
 	// 소켓 재연결
@@ -170,6 +172,15 @@
 		} else {
 			return `${diffSec}초`;
 		}
+	}
+
+	// 서버 정보 페이지로 이동
+	function viewServerInfo(server: UnityServerInfo) {
+		const params = new URLSearchParams({
+			serverId: server.id,
+			serverAlias: server.alias
+		});
+		goto(`/dashboard/serverInfo?${params.toString()}`);
 	}
 
 	onMount(() => {
@@ -284,6 +295,13 @@
 								</div>
 							</div>
 							<div class="server-actions">
+								<button
+									class="btn btn-info"
+									onclick={() => viewServerInfo(server)}
+									title="서버 상세 정보 보기"
+								>
+									서버 정보
+								</button>
 								<button
 									class="btn btn-danger"
 									onclick={() => disconnectUnityServer(server.id)}
@@ -596,5 +614,14 @@
 	.server-actions {
 		display: flex;
 		gap: 8px;
+	}
+
+	.btn-info {
+		background-color: #16a085;
+		color: white;
+	}
+
+	.btn-info:hover {
+		background-color: #138d75;
 	}
 </style>
