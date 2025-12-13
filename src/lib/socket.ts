@@ -247,7 +247,8 @@ class SocketManager extends EventEmitter {
 
 				if (servers.length === 1) {
 					// 특정 서버 타겟 경우 targetUnityId 자동 추가
-					(payload as any).targetServers = servers.map(s => s.id)
+					payload.targetServers = servers.map(s => s.id)
+					payload.target = 'unity';
 				}
 
 				socket.emit(event, payload);
