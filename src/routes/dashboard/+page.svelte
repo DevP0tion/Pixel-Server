@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { socketManager, type UnityServerInfo } from '$lib/socket';
+	import { socketManager, type UnityServerInfo, type ZoneInfo } from '$lib/socket';
 
 	// Unity 서버 기본 별칭
 	const DEFAULT_UNITY_ALIAS = 'Game Server';
@@ -8,6 +8,7 @@
 	// 상태
 	let isConnected = $state(false);
 	let unityServers: UnityServerInfo[] = $state([]);
+	let zones: ZoneInfo[] = $state([]);
 
 	// 별칭 편집 상태
 	let editingServerId: string | null = $state(null);
@@ -28,11 +29,14 @@
 			isConnected = true;
 			// Unity 서버 목록 요청
 			socketManager.sendSocketEvent('unity:list');
+			// Zones 목록 요청
+			socketManager.sendSocketEvent('zones:list');
 		});
 
 		addEventHandler('disconnect', () => {
 			isConnected = false;
 			unityServers = [];
+			zones = [];
 		});
 
 		// 환영 메시지에서 Unity 서버 목록 받기
@@ -94,6 +98,16 @@
 				editingAlias = '';
 			} else {
 				console.error(res.message);
+			}
+		});
+
+		// Zones 목록 응답
+		addEventHandler('zones:list', (data: unknown) => {
+			const zonesData = data as { zones?: ZoneInfo[]; code?: number; message?: string };
+			if (zonesData.zones) {
+				zones = zonesData.zones;
+			} else if (zonesData.code && zonesData.code !== 100) {
+				console.log('Zones 목록 요청 실패:', zonesData.message);
 			}
 		});
 	}
@@ -176,6 +190,7 @@
 		// 현재 연결 상태 동기화
 		isConnected = socketManager.isConnected;
 		unityServers = socketManager.unityServers;
+		zones = socketManager.zones;
 
 		// 이벤트 핸들러 등록
 		setupSocketEventHandlers();
@@ -184,8 +199,9 @@
 		if (!isConnected) {
 			socketManager.connect();
 		} else {
-			// 이미 연결되어 있으면 Unity 서버 목록 요청
+			// 이미 연결되어 있으면 Unity 서버 목록 및 Zones 목록 요청
 			socketManager.sendSocketEvent('unity:list');
+			socketManager.sendSocketEvent('zones:list');
 		}
 	});
 
@@ -291,6 +307,44 @@
 								>
 									연결 해제
 								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</section>
+
+		<!-- Zones 섹션 -->
+		<section class="section">
+			<div class="section-header">
+				<h2>Zones</h2>
+				<span class="server-count">{zones.length}개</span>
+			</div>
+
+			{#if zones.length === 0}
+				<div class="empty-state">
+					<div class="empty-icon">🌍</div>
+					<p>Zone 정보가 없습니다.</p>
+				</div>
+			{:else}
+				<div class="zones-grid">
+					{#each zones as zone (zone.name)}
+						<div class="zone-card">
+							<div class="zone-header">
+								<h3 class="zone-name">{zone.name}</h3>
+								<span class="zone-status" class:active={zone.status === 'active'}>{zone.status}</span>
+							</div>
+							<div class="zone-stats">
+								<div class="stat-item">
+									<span class="stat-label">플레이어:</span>
+									<span class="stat-value">{zone.playerCount} / {zone.maxPlayers}</span>
+								</div>
+								<div class="progress-bar">
+									<div
+										class="progress-fill"
+										style="width: {(zone.playerCount / zone.maxPlayers) * 100}%"
+									></div>
+								</div>
 							</div>
 						</div>
 					{/each}
@@ -596,5 +650,87 @@
 	.server-actions {
 		display: flex;
 		gap: 8px;
+	}
+
+	/* Zones 섹션 */
+	.zones-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+		gap: 16px;
+	}
+
+	.zone-card {
+		padding: 16px;
+		background-color: #1a1a2e;
+		border-radius: 8px;
+		border: 1px solid #0f3460;
+		transition: border-color 0.2s;
+	}
+
+	.zone-card:hover {
+		border-color: #3498db;
+	}
+
+	.zone-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+	}
+
+	.zone-name {
+		margin: 0;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #3498db;
+	}
+
+	.zone-status {
+		padding: 4px 8px;
+		border-radius: 4px;
+		font-size: 0.75rem;
+		font-weight: 500;
+		background-color: #7f8c8d;
+		color: white;
+		text-transform: uppercase;
+	}
+
+	.zone-status.active {
+		background-color: #2ecc71;
+	}
+
+	.zone-stats {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.stat-item {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.875rem;
+	}
+
+	.stat-label {
+		color: #7f8c8d;
+	}
+
+	.stat-value {
+		color: #ecf0f1;
+		font-weight: 600;
+	}
+
+	.progress-bar {
+		width: 100%;
+		height: 8px;
+		background-color: #0f3460;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #3498db 0%, #2ecc71 100%);
+		transition: width 0.3s ease;
 	}
 </style>

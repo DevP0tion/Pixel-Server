@@ -271,6 +271,11 @@ export function startSocketServer(port: number = 7777) {
 				console.log(`[Relay] Unity → 웹: game:event`);
 				relayResponseToWeb('game:event', data, connectedClients);
 			});
+
+			socket.on('zones:list', (data) => {
+				console.log(`[Relay] Unity → 웹: zones:list`);
+				relayResponseToWeb('zones:list', data, connectedClients);
+			});
 		}
 
 		// Svelte 서버 명령어 이벤트 핸들러
@@ -305,6 +310,44 @@ export function startSocketServer(port: number = 7777) {
 					DEFAULT_UNITY_ALIAS
 				)
 			});
+		});
+
+		// Zones 목록 요청 핸들러
+		socket.on('zones:list', (data: { targetUnityId?: string } = {}) => {
+			const targetUnityId = data.targetUnityId;
+
+			if (targetUnityId) {
+				// 특정 Unity 서버에 zones:list 요청
+				const unitySocket = unityServers.get(targetUnityId);
+				if (!unitySocket || !unitySocket.connected) {
+					socket.emit('zones:list', {
+						code: 404,
+						message: `Unity 서버를 찾을 수 없습니다: ${targetUnityId}`,
+						zones: []
+					});
+					return;
+				}
+				// Unity 서버에 zones:list 요청 전달
+				unitySocket.emit('zones:list', {});
+			} else if (unityServers.size > 0) {
+				// 첫 번째 Unity 서버에 요청 (기본 동작)
+				const firstUnitySocket = Array.from(unityServers.values())[0];
+				if (firstUnitySocket && firstUnitySocket.connected) {
+					firstUnitySocket.emit('zones:list', {});
+				} else {
+					socket.emit('zones:list', {
+						code: 503,
+						message: 'Unity 서버가 연결되어 있지 않습니다.',
+						zones: []
+					});
+				}
+			} else {
+				socket.emit('zones:list', {
+					code: 503,
+					message: 'Unity 서버가 연결되어 있지 않습니다.',
+					zones: []
+				});
+			}
 		});
 
 		// Unity 서버 별칭 변경 핸들러
