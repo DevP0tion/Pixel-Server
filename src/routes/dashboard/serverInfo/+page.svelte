@@ -46,10 +46,7 @@
 				isLoading = false;
 				errorMessage = '';
 			} else if (zonesData.code && zonesData.code !== 100) {
-				console.error(
-					`Zones 목록 요청 실패 (코드: ${zonesData.code}):`,
-					zonesData.message
-				);
+				console.error(`Zones 목록 요청 실패 (코드: ${zonesData.code}):`, zonesData.message);
 				errorMessage = zonesData.message || 'Zones 정보를 가져올 수 없습니다.';
 				isLoading = false;
 			}
@@ -58,6 +55,7 @@
 
 	// Zones 목록 요청
 	function requestZones() {
+		console.log('Zones 목록 요청 중...');
 		if (!serverId) {
 			errorMessage = '서버 ID가 없습니다.';
 			isLoading = false;
@@ -66,7 +64,7 @@
 
 		isLoading = true;
 		errorMessage = '';
-		socketManager.sendSocketEvent('zones:list', { targetUnityId: serverId });
+		socketManager.unityServers(serverId).sendSocketEvent('zones:list');
 	}
 
 	// 뒤로 가기
@@ -93,11 +91,11 @@
 		setupSocketEventHandlers();
 
 		// 아직 연결되지 않은 경우 연결 시도
-		if (!isConnected) {
-			socketManager.connect();
-		} else {
-			// 이미 연결되어 있으면 Zones 목록 요청
+		if (isConnected) {
 			requestZones();
+		} else {
+			console.log('소켓이 연결되지 않음, 연결 시도 중...');
+			socketManager.connect();
 		}
 	});
 
@@ -161,7 +159,9 @@
 						<div class="zone-card">
 							<div class="zone-header">
 								<h3 class="zone-name">{zone.name}</h3>
-								<span class="zone-status" class:active={zone.status === 'active'}>{zone.status}</span>
+								<span class="zone-status" class:active={zone.status === 'active'}
+									>{zone.status}</span
+								>
 							</div>
 							<div class="zone-stats">
 								<div class="stat-item">
@@ -169,10 +169,7 @@
 									<span class="stat-value">{zone.playerCount} / {zone.maxPlayers}</span>
 								</div>
 								<div class="progress-bar">
-									<div
-										class="progress-fill"
-										style="width: {getZoneOccupancyPercent(zone)}%"
-									></div>
+									<div class="progress-fill" style="width: {getZoneOccupancyPercent(zone)}%"></div>
 								</div>
 							</div>
 						</div>

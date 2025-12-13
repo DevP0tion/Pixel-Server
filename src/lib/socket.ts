@@ -6,14 +6,14 @@ import { io, type Socket } from 'socket.io-client';
 import EventEmitter from 'eventemitter3';
 
 // Unity 서버 정보 인터페이스
-export interface UnityServerInfo {
+export type UnityServerInfo = {
 	id: string;
 	connectedAt: string;
 	alias: string;
 }
 
 // Zone 정보 인터페이스
-export interface ZoneInfo {
+export type ZoneInfo = {
 	name: string;
 	playerCount: number;
 	maxPlayers: number;
@@ -21,7 +21,7 @@ export interface ZoneInfo {
 }
 
 // 소켓 상태 타입
-export interface SocketState {
+export type SocketState = {
 	isConnected: boolean;
 	isUnityConnected: boolean;
 	clientId: string | null;
@@ -48,10 +48,6 @@ class SocketManager extends EventEmitter {
 
 	get clientId(): string | null {
 		return this._clientId;
-	}
-
-	get unityServers(): UnityServerInfo[] {
-		return this._unityServers;
 	}
 
 	get zones(): ZoneInfo[] {
@@ -234,6 +230,35 @@ class SocketManager extends EventEmitter {
 		this._clientId = null;
 		this._unityServers = [];
 		this._zones = [];
+	}
+
+	unityServers(...id: string[]) {
+		let servers: UnityServerInfo[] = [];
+		const {socket, _isConnected} = this;
+
+		if (id.length === 0) 
+			servers = this._unityServers;
+		else
+			servers = this._unityServers.filter(server => id.includes(server.id));
+
+		function sendSocketEvent (event: string, args: { [ key: string ]: any } | undefined = undefined) {
+			if (socket && _isConnected) {
+				const payload = args ? { ...args } : {};
+
+				if (servers.length === 1) {
+					// 특정 서버 타겟 경우 targetUnityId 자동 추가
+					(payload as any).targetServers = servers.map(s => s.id)
+				}
+
+				socket.emit(event, payload);
+			}
+		}
+
+
+		return {
+			servers,
+			sendSocketEvent
+		}
 	}
 }
 
