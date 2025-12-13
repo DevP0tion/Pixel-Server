@@ -186,6 +186,11 @@
 		}
 	}
 
+	// Zone 플레이어 비율 계산
+	function getZoneOccupancyPercent(zone: ZoneInfo): number {
+		return zone.maxPlayers > 0 ? (zone.playerCount / zone.maxPlayers) * 100 : 0;
+	}
+
 	onMount(() => {
 		// 현재 연결 상태 동기화
 		isConnected = socketManager.isConnected;
@@ -342,7 +347,7 @@
 								<div class="progress-bar">
 									<div
 										class="progress-fill"
-										style="width: {zone.maxPlayers > 0 ? (zone.playerCount / zone.maxPlayers) * 100 : 0}%"
+										style="width: {getZoneOccupancyPercent(zone)}%"
 									></div>
 								</div>
 							</div>

@@ -5,13 +5,6 @@
 import { io, type Socket } from 'socket.io-client';
 import EventEmitter from 'eventemitter3';
 
-// 소켓 상태 타입
-export interface SocketState {
-	isConnected: boolean;
-	isUnityConnected: boolean;
-	clientId: string | null;
-}
-
 // Unity 서버 정보 인터페이스
 export interface UnityServerInfo {
 	id: string;
@@ -25,6 +18,14 @@ export interface ZoneInfo {
 	playerCount: number;
 	maxPlayers: number;
 	status: string;
+}
+
+// 소켓 상태 타입
+export interface SocketState {
+	isConnected: boolean;
+	isUnityConnected: boolean;
+	clientId: string | null;
+	zones: ZoneInfo[];
 }
 
 // 소켓 관리자 클래스
@@ -197,7 +198,8 @@ class SocketManager extends EventEmitter {
 		return {
 			isConnected: this._isConnected,
 			isUnityConnected: this._isUnityConnected,
-			clientId: this._clientId
+			clientId: this._clientId,
+			zones: this._zones
 		};
 	}
 
