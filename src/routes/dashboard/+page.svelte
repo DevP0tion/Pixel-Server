@@ -107,7 +107,10 @@
 			if (zonesData.zones) {
 				zones = zonesData.zones;
 			} else if (zonesData.code && zonesData.code !== 100) {
-				console.error('Zones 목록 요청 실패:', zonesData.message);
+				console.error(
+					`Zones 목록 요청 실패 (코드: ${zonesData.code}):`,
+					zonesData.message
+				);
 			}
 		});
 	}
