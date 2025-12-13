@@ -107,7 +107,7 @@
 			if (zonesData.zones) {
 				zones = zonesData.zones;
 			} else if (zonesData.code && zonesData.code !== 100) {
-				console.log('Zones 목록 요청 실패:', zonesData.message);
+				console.error('Zones 목록 요청 실패:', zonesData.message);
 			}
 		});
 	}
@@ -342,7 +342,7 @@
 								<div class="progress-bar">
 									<div
 										class="progress-fill"
-										style="width: {(zone.playerCount / zone.maxPlayers) * 100}%"
+										style="width: {zone.maxPlayers > 0 ? (zone.playerCount / zone.maxPlayers) * 100 : 0}%"
 									></div>
 								</div>
 							</div>
