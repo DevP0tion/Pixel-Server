@@ -95,6 +95,16 @@ payload:
 
 ```typescript
 Room: SocketRooms.UnityServers
+event: server_status
+payload:
+{
+  online: boolean;
+  timestamp: number; // Unix ms
+}
+```
+
+```typescript
+Room: SocketRooms.UnityServers
 event: zones:list
 payload:
 {
@@ -241,6 +251,16 @@ event: game:event
 payload:
 {
   // forwarded as-is from Unity
+}
+```
+
+```typescript
+Room: SocketRooms.WebClients
+event: server_status
+payload:
+{
+  online: boolean;
+  timestamp: number; // Unix ms
 }
 ```
 

@@ -340,6 +340,11 @@ export function startSocketServer(port: number = 7777) {
 				relayResponseToWeb('game:event', data, connectedClients);
 			});
 
+			socket.on('server_status', (data) => {
+				console.log(`[Relay] Unity → 웹: server_status`);
+				relayResponseToWeb('server_status', data, connectedClients);
+			});
+
 			socket.on('zones:list', (data) => {
 				console.log(`[Relay] Unity → 웹: zones:list`);
 				relayResponseToWeb('zones:list', data, connectedClients);
