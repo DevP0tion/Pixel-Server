@@ -64,7 +64,7 @@
 
 		isLoading = true;
 		errorMessage = '';
-		socketManager.unityServers(serverId).sendSocketEvent('zones:list');
+		socketManager.unityServers(serverId).sendUnityEvent('zones:list');
 	}
 
 	// 뒤로 가기

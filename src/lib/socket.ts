@@ -208,6 +208,22 @@ class SocketManager extends EventEmitter {
 		return false;
 	}
 
+	// Unity 서버 대상으로 이벤트 전송 (webToUnity 래퍼)
+	sendUnityEvent(cmd: string, data: Record<string, unknown> = {}, targetUnityId?: string): boolean {
+		const payloadData = { ...data };
+
+		if (targetUnityId) {
+			payloadData.targetUnityId = targetUnityId;
+		}
+
+		const payload =
+			Object.keys(payloadData).length > 0
+				? { cmd, data: payloadData }
+				: { cmd };
+
+		return this.sendSocketEvent('webToUnity', payload);
+	}
+
 	// 재연결
 	reconnect(): Socket {
 		if (this.socket) {
@@ -234,32 +250,27 @@ class SocketManager extends EventEmitter {
 
 	unityServers(...id: string[]) {
 		let servers: UnityServerInfo[] = [];
-		const {socket, _isConnected} = this;
+		const targetUnityId = id.length === 1 ? id[0] : undefined;
 
-		if (id.length === 0) 
+		if (id.length === 0) {
 			servers = this._unityServers;
-		else
-			servers = this._unityServers.filter(server => id.includes(server.id));
-
-		function sendSocketEvent (event: string, args: { [ key: string ]: any } | undefined = undefined) {
-			if (socket && _isConnected) {
-				const payload = args ? { ...args } : {};
-
-				if (servers.length === 1) {
-					// 특정 서버 타겟 경우 targetUnityId 자동 추가
-					payload.targetServers = servers.map(s => s.id)
-					payload.target = 'unity';
-				}
-
-				socket.emit(event, payload);
-			}
+		} else {
+			servers = this._unityServers.filter((server) => id.includes(server.id));
 		}
 
+		const sendUnityEvent = (cmd: string, data: Record<string, unknown> = {}) => {
+			return this.sendUnityEvent(cmd, data, targetUnityId);
+		};
+
+		const sendSocketEvent = (event: string, args: { [key: string]: any } | undefined = undefined) => {
+			return sendUnityEvent(event, args ?? {});
+		};
 
 		return {
 			servers,
+			sendUnityEvent,
 			sendSocketEvent
-		}
+		};
 	}
 }
 

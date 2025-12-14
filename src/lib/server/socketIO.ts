@@ -31,6 +31,11 @@ interface UnityCommandPayload {
 	data: Record<string, unknown>;
 }
 
+interface WebToUnityPayload {
+	cmd: string;
+	data?: Record<string, unknown>;
+}
+
 /**
  * 현재 연결된 Unity 서버 목록 가져오기
  */
@@ -341,6 +346,47 @@ export function startSocketServer(port: number = 7777) {
 			});
 		}
 
+		const handleUnityCommand = (commandSocket: Socket, data: CommandData | undefined) => {
+			if (!data || typeof data.cmd !== 'string') {
+				commandSocket.emit('command:response', {
+					code: 400,
+					message: '명령어 데이터가 비어있습니다.'
+				});
+				return;
+			}
+
+			const client = connectedClients.get(commandSocket.id);
+			const target = resolveCommandTarget(data, client?.clientType);
+
+			if (client?.clientType === 'web') {
+				if (target === 'unity') {
+					console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
+					// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
+					relayCommandToUnity(commandSocket, data, unityServers);
+					return;
+				}
+
+				if (target === 'socketIO') {
+					console.log(`[Command] unity:command 수신 (웹 → SocketIO): ${data.cmd}`);
+					// SocketIO 서버에서 처리
+					commandHandler.handleCommand(commandSocket, data);
+					return;
+				}
+
+				commandSocket.emit('command:response', {
+					code: 400,
+					message: `지원하지 않는 명령 대상입니다: ${String(data.target)}`
+				});
+				return;
+			}
+
+			if (client?.clientType === 'unity') {
+				console.log(`[Command] unity:command 수신 (Unity): ${data.cmd}`);
+				// Unity 서버에서 온 명령어 → 직접 처리
+				commandHandler.handleCommand(commandSocket, data);
+			}
+		};
+
 		// Svelte 서버 명령어 이벤트 핸들러
 		socket.on('svelte:command', (data: CommandData) => {
 			console.log(`[Command] svelte:command 수신: ${data.cmd}`);
@@ -350,41 +396,46 @@ export function startSocketServer(port: number = 7777) {
 
 		// 명령어 라우팅 이벤트 핸들러 (target에 따라 Unity 또는 SocketIO 처리)
 		socket.on('unity:command', (data: CommandData) => {
-			if (!data) {
+			handleUnityCommand(socket, data);
+		});
+
+		// 웹 콘솔 → Unity 라우팅 통합 핸들러
+		socket.on('webToUnity', (payload: WebToUnityPayload) => {
+			const client = connectedClients.get(socket.id);
+			if (client?.clientType !== 'web') {
 				socket.emit('command:response', {
-					code: 400,
-					message: '명령어 데이터가 비어있습니다.'
+					code: 403,
+					message: 'webToUnity 이벤트는 웹 콘솔만 사용할 수 있습니다.'
 				});
 				return;
 			}
 
-			const client = connectedClients.get(socket.id);
-			const target = resolveCommandTarget(data, client?.clientType);
-
-			if (client?.clientType === 'web') {
-				if (target === 'unity') {
-					console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
-					// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
-					relayCommandToUnity(socket, data, unityServers);
-					return;
-				}
-
-				if (target === 'socketIO') {
-					console.log(`[Command] unity:command 수신 (웹 → SocketIO): ${data.cmd}`);
-					// SocketIO 서버에서 처리
-					commandHandler.handleCommand(socket, data);
-					return;
-				}
-
+			if (!payload || typeof payload.cmd !== 'string') {
 				socket.emit('command:response', {
 					code: 400,
-					message: `지원하지 않는 명령 대상입니다: ${String(data.target)}`
+					message: 'webToUnity 이벤트에는 cmd가 필요합니다.'
 				});
-			} else if (client?.clientType === 'unity') {
-				console.log(`[Command] unity:command 수신 (Unity): ${data.cmd}`);
-				// Unity 서버에서 온 명령어 → 직접 처리
-				commandHandler.handleCommand(socket, data);
+				return;
 			}
+
+			const { cmd, data } = payload;
+
+			if (cmd === 'unity:command') {
+				handleUnityCommand(socket, data as CommandData);
+				return;
+			}
+
+			if (cmd === 'zones:list') {
+				const targetUnityId = (data as { targetUnityId?: string } | undefined)?.targetUnityId;
+				console.log(`[Command] webToUnity 수신 (zones:list)`);
+				relayToUnityServer(socket, 'zones:list', targetUnityId, {}, unityServers, 'zones');
+				return;
+			}
+
+			socket.emit('command:response', {
+				code: 404,
+				message: `지원하지 않는 webToUnity cmd 입니다: ${cmd}`
+			});
 		});
 
 		// Unity 서버 목록 요청 핸들러

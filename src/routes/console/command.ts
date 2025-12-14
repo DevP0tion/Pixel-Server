@@ -153,7 +153,7 @@ export function sendToServer(
 		// targetUnityId를 args 안에 포함시켜서 전송
 		const commandArgs =
 			selectedUnityServer === 'all' ? args : { ...args, targetUnityId: selectedUnityServer };
-		socketManager.sendSocketEvent('unity:command', { target: 'unity', cmd, args: commandArgs });
+		socketManager.sendUnityEvent('unity:command', { target: 'unity', cmd, args: commandArgs });
 		const serverInfo =
 			selectedUnityServer === 'all'
 				? '모든 Unity 서버'
