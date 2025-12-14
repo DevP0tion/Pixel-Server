@@ -9,4 +9,4 @@ export const dbPool = initializeDatabase();
 export const { app: firebaseApp, auth: firebaseAuth } = initializeFirebase();
 
 // Socket.IO 서버 시작
-startSocketServer(7777);
+export const server = startSocketServer(7777);

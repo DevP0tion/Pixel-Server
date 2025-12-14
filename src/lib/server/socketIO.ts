@@ -4,7 +4,8 @@ import {
 	type CommandTarget,
 	type ConnectedClient,
 	type ClientType,
-	SocketCommandHandler
+	SocketCommandHandler,
+	SocketRooms
 } from '$lib/server/index.js';
 import { loadCommands } from '$lib/server/commands.js';
 
@@ -33,7 +34,7 @@ interface UnityCommandPayload {
 
 interface WebToUnityPayload {
 	cmd: string;
-	data?: Record<string, unknown>;
+	data: CommandData;
 }
 
 /**
@@ -289,10 +290,10 @@ export function startSocketServer(port: number = 7777) {
 
 		// 클라이언트 타입에 따라 room에 join
 		if (clientType === 'unity') {
-			socket.join('game');
+			socket.join(SocketRooms.UnityServers);
 			console.log(`[Room] Unity 서버가 'game' 채널에 참여했습니다: ${socket.id}`);
 		} else {
-			socket.join('web');
+			socket.join(SocketRooms.WebClients);
 			console.log(`[Room] 웹 콘솔이 'web' 채널에 참여했습니다: ${socket.id}`);
 		}
 
@@ -301,7 +302,6 @@ export function startSocketServer(port: number = 7777) {
 			unityServers.set(socket.id, socket);
 			// 기본 별칭 설정
 			unityServerAliases.set(socket.id, DEFAULT_UNITY_ALIAS);
-			console.log(`[Unity] Unity 서버가 연결되었습니다. (총 ${unityServers.size}개)`);
 
 			// 모든 웹 콘솔에 Unity 서버 연결 알림
 			relayResponseToWeb(
@@ -589,5 +589,5 @@ export function startSocketServer(port: number = 7777) {
 	console.log(`Starting game server on port ${port}`);
 	io.listen(port);
 
-	return io;
+	return {io, unityServers};
 }

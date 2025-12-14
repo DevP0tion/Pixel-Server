@@ -17,3 +17,8 @@ export { SocketCommandHandler } from './SocketCommandHandler.js';
 
 // Commands
 export { loadCommands } from './commands.js';
+
+export const SocketRooms = {
+	UnityServers: 'unity_servers',
+	WebClients: 'web_clients'
+}
