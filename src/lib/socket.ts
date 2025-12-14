@@ -5,14 +5,14 @@
 import { io, type Socket } from 'socket.io-client';
 import EventEmitter from 'eventemitter3';
 
-// Unity 서버 정보 인터페이스
+// Unity 서버 정보 타입
 export type UnityServerInfo = {
 	id: string;
 	connectedAt: string;
 	alias: string;
 }
 
-// Zone 정보 인터페이스
+// Zone 정보 타입
 export type ZoneInfo = {
 	name: string;
 	playerCount: number;
@@ -209,19 +209,14 @@ class SocketManager extends EventEmitter {
 	}
 
 	// Unity 서버 대상으로 이벤트 전송 (webToUnity 래퍼)
-	sendUnityEvent(cmd: string, data: Record<string, unknown> = {}, targetUnityId?: string): boolean {
-		const payloadData = { ...data };
-
-		if (targetUnityId) {
-			payloadData.targetUnityId = targetUnityId;
-		}
-
-		const payload =
-			Object.keys(payloadData).length > 0
-				? { cmd, data: payloadData }
-				: { cmd };
-
-		return this.sendSocketEvent('webToUnity', payload);
+	sendUnityEvent(cmd: string, data: Record<string, unknown> = {}, ...targets: string[]) {
+		return this.sendSocketEvent('webToUnity', 
+			{ 
+				target: targets && targets.length > 0 ? targets : this._unityServers.map((server) => server.id),
+				cmd,
+				...data
+			}
+		);
 	}
 
 	// 재연결
@@ -249,27 +244,17 @@ class SocketManager extends EventEmitter {
 	}
 
 	unityServers(...id: string[]) {
-		let servers: UnityServerInfo[] = [];
-		const targetUnityId = id.length === 1 ? id[0] : undefined;
+		const { _unityServers, sendUnityEvent } = this;
 
-		if (id.length === 0) {
-			servers = this._unityServers;
-		} else {
-			servers = this._unityServers.filter((server) => id.includes(server.id));
-		}
+		let servers = id.length === 0 ? _unityServers : _unityServers.filter((server) => id.includes(server.id));
 
-		const sendUnityEvent = (cmd: string, data: Record<string, unknown> = {}) => {
-			return this.sendUnityEvent(cmd, data, targetUnityId);
-		};
-
-		const sendSocketEvent = (event: string, args: { [key: string]: any } | undefined = undefined) => {
-			return sendUnityEvent(event, args ?? {});
+		const send = (cmd: string, data: Record<string, unknown> = {}) => {
+			return sendUnityEvent(cmd, data, ...id);
 		};
 
 		return {
 			servers,
-			sendUnityEvent,
-			sendSocketEvent
+			send
 		};
 	}
 }
