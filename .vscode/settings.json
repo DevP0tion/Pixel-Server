@@ -1,3 +1,12 @@
 {
-	"i18n-ally.localesPaths": ["src/lib/server/i18n"]
+	"i18n-ally.localesPaths": [
+		"src/lib/server/i18n"
+	],
+	"chat.mcp.serverSampling": {
+		"Pixel-Server/.vscode/mcp.json: io.github.ChromeDevTools/chrome-devtools-mcp": {
+			"allowedModels": [
+				"copilot/auto"
+			]
+		}
+	}
 }

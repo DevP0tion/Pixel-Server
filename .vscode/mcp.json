@@ -17,6 +17,14 @@
 			},
 			"type": "stdio"
 		},
+		"curl": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@mcp-get-community/server-curl"
+			],
+			"type": "stdio"
+		},
 		"io.github.ChromeDevTools/chrome-devtools-mcp": {
 			"type": "stdio",
 			"command": "npx",
