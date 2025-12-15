@@ -1,5 +1,5 @@
 ---
-name: your-skill-name
+name: curl control
 description: Briefly state what this skill updates and when to use it.
 ---
 
