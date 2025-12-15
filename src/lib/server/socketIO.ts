@@ -245,6 +245,9 @@ export function startSocketServer(port: number = 7777) {
 	// Unity 서버 클라이언트들 (여러 Unity 서버 지원)
 	const unityServers: Map<string, Socket> = new Map();
 
+	// 웹 콘솔 클라이언트들
+	const webClients: Map<string, Socket> = new Map();
+
 	// Unity 서버 별칭 저장소
 	const unityServerAliases: Map<string, string> = new Map();
 
@@ -290,17 +293,10 @@ export function startSocketServer(port: number = 7777) {
 
 		// 클라이언트 타입에 따라 room에 join
 		if (clientType === 'unity') {
-			socket.join(SocketRooms.UnityServers);
-			console.log(`[Room] Unity 서버가 'game' 채널에 참여했습니다: ${socket.id}`);
-		} else {
-			socket.join(SocketRooms.WebClients);
-			console.log(`[Room] 웹 콘솔이 'web' 채널에 참여했습니다: ${socket.id}`);
-		}
-
-		// Unity 서버인 경우 저장
-		if (clientType === 'unity') {
 			unityServers.set(socket.id, socket);
-			// 기본 별칭 설정
+			socket.join(SocketRooms.UnityServers);
+
+						// 기본 별칭 설정
 			unityServerAliases.set(socket.id, DEFAULT_UNITY_ALIAS);
 
 			// 모든 웹 콘솔에 Unity 서버 연결 알림
@@ -349,6 +345,13 @@ export function startSocketServer(port: number = 7777) {
 				console.log(`[Relay] Unity → 웹: zones:list`);
 				relayResponseToWeb('zones:list', data, connectedClients);
 			});
+
+			console.log(`[Room] Unity 서버가 'game' 채널에 참여했습니다: ${socket.id}`);
+		} else {
+			socket.join(SocketRooms.WebClients);
+			webClients.set(socket.id, socket);
+
+			console.log(`[Room] 웹 콘솔이 'web' 채널에 참여했습니다: ${socket.id}`);
 		}
 
 		const handleUnityCommand = (commandSocket: Socket, data: CommandData | undefined) => {
@@ -594,5 +597,5 @@ export function startSocketServer(port: number = 7777) {
 	console.log(`Starting game server on port ${port}`);
 	io.listen(port);
 
-	return {io, unityServers};
+	return {io, unityServers, webClients};
 }
