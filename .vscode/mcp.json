@@ -1,20 +1,37 @@
 {
 	"servers": {
-		"io.github.github/github-mcp-server": {
-			"type": "http",
-			"url": "https://api.githubcopilot.com/mcp/",
-			"headers": {
-				"Authorization": "${input:Authorization}"
+		"github": {
+			"command": "npx",
+			"args": [
+				"@modelcontextprotocol/server-github"
+			],
+			"env": {
+				"GITHUB_TOKEN": "${input:GITHUB_TOKEN}"
 			},
+			"type": "stdio"
+		},
+		"obsidian": {
+			"command": "F:\\workspace\\Note\\Pixel-Collector\\.obsidian\\plugins\\mcp-tools\\bin\\mcp-server.exe",
+			"env": {
+				"OBSIDIAN_API_KEY": "b212e8a3a91e71c8374c605eb239e7af561900f72d0937c784b8c99f79708ebe"
+			},
+			"type": "stdio"
+		},
+		"io.github.ChromeDevTools/chrome-devtools-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"chrome-devtools-mcp@0.12.1"
+			],
 			"gallery": "https://api.mcp.github.com",
-			"version": "0.24.1"
+			"version": "0.12.1"
 		}
 	},
 	"inputs": [
 		{
-			"id": "Authorization",
+			"id": "GITHUB_TOKEN",
 			"type": "promptString",
-			"description": "Authentication token (PAT or App token)",
+			"description": "GitHub PAT with repo scope for MCP server",
 			"password": true
 		}
 	]
