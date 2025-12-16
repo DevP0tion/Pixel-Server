@@ -1,6 +1,5 @@
 import { Server, type Socket } from 'socket.io';
 import {
-	type CommandData,
 	type CommandTarget,
 	type ConnectedClient,
 	type ClientType,
@@ -8,34 +7,29 @@ import {
 	SocketRooms
 } from '$lib/server/index.js';
 import { loadCommands } from '$lib/server/commands.js';
+import type { CommandData } from './types';
 
 // Unity 서버 정보를 웹 클라이언트에게 전송하기 위한 인터페이스
-interface UnityServerInfo {
+type UnityServerInfo = {
 	id: string;
 	connectedAt: string;
 	alias: string;
 }
 
-export interface UnityResponsePayload {
+export type UnityResponse = {
 	code: number;
 	message: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	data: any;
+	token: string;
 }
 
-/**
- * Unity 서버로 전송하는 명령어 데이터 형식
- * Unity에서 수신하는 형식: {cmd: string, data: any}
- */
-interface UnityCommandPayload {
-	cmd: string;
-	data: Record<string, unknown>;
-}
+// Unity 서버 기본 별칭
+const DEFAULT_UNITY_ALIAS = 'Game Server';
 
-interface WebToUnityPayload {
-	cmd: string;
-	data: CommandData;
-}
+// CORS 설정
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+	? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
+	: '*';
 
 /**
  * 현재 연결된 Unity 서버 목록 가져오기
@@ -47,6 +41,7 @@ function getUnityServerList(
 	DEFAULT_UNITY_ALIAS: string
 ): UnityServerInfo[] {
 	const list: UnityServerInfo[] = [];
+	
 	unityServers.forEach((socket, id) => {
 		const client = connectedClients.get(id);
 		if (client) {
@@ -57,154 +52,8 @@ function getUnityServerList(
 			});
 		}
 	});
+
 	return list;
-}
-
-/**
- * CommandData를 Unity 명령어 페이로드로 변환
- * @param data 원본 CommandData
- * @returns Unity 서버용 명령어 페이로드
- */
-function formatUnityPayload(data: CommandData): UnityCommandPayload {
-	// args에서 targetUnityId 제거 후 data로 변환
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const { targetUnityId: _targetUnityId, ...restArgs } = data.args ?? {};
-
-	return {
-		cmd: data.cmd,
-		data: restArgs
-	};
-}
-
-/**
- * Unity 서버 선택 및 이벤트 전송 헬퍼 함수
- * @param webSocket 웹 콘솔 소켓
- * @param eventName 전송할 이벤트 이름
- * @param targetUnityId 특정 Unity 서버 ID (선택)
- * @param payload 전송할 데이터
- * @param unityServers Unity 서버 맵
- * @param errorEmptyDataKey 데이터가 없을 때 응답에 포함할 키
- */
-function relayToUnityServer(
-	webSocket: Socket,
-	eventName: string,
-	targetUnityId: string | undefined,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	payload: any,
-	unityServers: Map<string, Socket>,
-	errorEmptyDataKey: string
-) {
-	if (targetUnityId) {
-		// 특정 Unity 서버에 요청
-		const unitySocket = unityServers.get(targetUnityId);
-		if (!unitySocket || !unitySocket.connected) {
-			webSocket.emit(eventName, {
-				code: 404,
-				message: `Unity 서버를 찾을 수 없습니다: ${targetUnityId}`,
-				[errorEmptyDataKey]: []
-			});
-			return;
-		}
-		unitySocket.emit(eventName, payload);
-	} else if (unityServers.size > 0) {
-		// 첫 번째 Unity 서버에 요청
-		const firstUnitySocket = Array.from(unityServers.values())[0];
-		if (firstUnitySocket && firstUnitySocket.connected) {
-			firstUnitySocket.emit(eventName, payload);
-		} else {
-			webSocket.emit(eventName, {
-				code: 503,
-				message: 'Unity 서버가 연결되어 있지 않습니다.',
-				[errorEmptyDataKey]: []
-			});
-		}
-	} else {
-		webSocket.emit(eventName, {
-			code: 503,
-			message: 'Unity 서버가 연결되어 있지 않습니다.',
-			[errorEmptyDataKey]: []
-		});
-	}
-}
-
-/**
- * Unity 서버로 명령어를 전달하는 함수
- * @param webSocket 웹 콘솔 소켓 (응답을 받을 소켓)
- * @param data 명령어 데이터 (args.targetUnityId로 특정 Unity 서버 지정, 없으면 모든 서버로 전송)
- */
-function relayCommandToUnity(
-	webSocket: Socket,
-	data: CommandData,
-	unityServers: Map<string, Socket>
-) {
-	const targetUnityId = data.args?.targetUnityId as string | undefined;
-	const unityPayload = formatUnityPayload(data);
-
-	if (targetUnityId) {
-		// 특정 Unity 서버 ID가 지정된 경우
-		const unitySocket = unityServers.get(targetUnityId);
-		if (!unitySocket) {
-			webSocket.emit('command:response', {
-				code: 404,
-				message: `지정된 Unity 서버를 찾을 수 없습니다: ${targetUnityId}`
-			});
-			console.log(
-				`[Relay] 지정된 Unity 서버 없음 - 명령어 전달 실패: ${data.cmd} (대상: ${targetUnityId})`
-			);
-			return;
-		}
-
-		if (unitySocket.connected) {
-			unitySocket.emit('unity:command', unityPayload);
-			webSocket.emit('command:relayed', {
-				code: 100,
-				message: `Unity 서버로 명령어 전달됨: ${data.cmd}`,
-				targetUnityIds: [unitySocket.id],
-				data: unityPayload
-			});
-			console.log(`[Relay] 웹 → Unity(${unitySocket.id}): ${data.cmd}`);
-		} else {
-			webSocket.emit('command:response', {
-				code: 503,
-				message: `Unity 서버가 연결되어 있지 않습니다: ${targetUnityId}`
-			});
-			console.log(`[Relay] Unity 서버 연결 끊김 - 명령어 전달 실패: ${data.cmd}`);
-		}
-	} else {
-		// targetUnityId가 없으면 모든 Unity 서버로 브로드캐스트
-		if (unityServers.size === 0) {
-			webSocket.emit('command:response', {
-				code: 503,
-				message: 'Unity 서버가 연결되어 있지 않습니다.'
-			});
-			console.log(`[Relay] Unity 서버 없음 - 명령어 전달 실패: ${data.cmd}`);
-			return;
-		}
-
-		const sentTo: string[] = [];
-		unityServers.forEach((unitySocket, id) => {
-			if (unitySocket.connected) {
-				unitySocket.emit('unity:command', unityPayload);
-				sentTo.push(id);
-			}
-		});
-
-		if (sentTo.length > 0) {
-			webSocket.emit('command:relayed', {
-				code: 100,
-				message: `${sentTo.length}개의 Unity 서버로 명령어 전달됨: ${data.cmd}`,
-				targetUnityIds: sentTo,
-				data: unityPayload
-			});
-			console.log(`[Relay] 웹 → Unity(${sentTo.join(', ')}): ${data.cmd}`);
-		} else {
-			webSocket.emit('command:response', {
-				code: 503,
-				message: '연결된 Unity 서버가 모두 응답하지 않습니다.'
-			});
-			console.log(`[Relay] 모든 Unity 서버 연결 끊김 - 명령어 전달 실패: ${data.cmd}`);
-		}
-	}
 }
 
 /**
@@ -225,17 +74,6 @@ function relayResponseToWeb(
 }
 
 /**
- * 명령어 타겟 결정 (기본값: 웹 → Unity, Unity → SocketIO)
- */
-function resolveCommandTarget(data: CommandData, clientType?: ClientType): CommandTarget {
-	if (data.target === 'unity' || data.target === 'socketIO') {
-		return data.target;
-	}
-
-	return clientType === 'unity' ? 'socketIO' : 'unity';
-}
-
-/**
  * Socket.IO 서버 시작
  */
 export function startSocketServer(port: number = 7777) {
@@ -251,14 +89,6 @@ export function startSocketServer(port: number = 7777) {
 	// Unity 서버 별칭 저장소
 	const unityServerAliases: Map<string, string> = new Map();
 
-	// Unity 서버 기본 별칭
-	const DEFAULT_UNITY_ALIAS = 'Game Server';
-
-	// CORS 설정
-	const allowedOrigins = process.env.ALLOWED_ORIGINS
-		? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
-		: '*';
-
 	// Socket.IO 서버 인스턴스
 	const io = new Server({
 		cors: {
@@ -272,6 +102,70 @@ export function startSocketServer(port: number = 7777) {
 
 	// 기본 명령어 등록 (commands.ts에서 로드)
 	loadCommands(commandHandler, connectedClients);
+
+	// 
+	function unity(...unityServerNames: string[]) {
+		const servers = Array.from(unityServers.values().filter((socket, _) => unityServerNames.includes(socket.id)));
+
+		function send(cmd: string, data: any = {}) {
+			servers.forEach((server) => {
+				server.emit('unity:command',
+					{
+						cmd: cmd,
+						data: data
+					}
+				);
+			});
+		}
+
+		async function fetch(cmd: string, data: any = {}, timeout: number = 5000): Promise<(UnityResponse & {socket: Socket})[]> {
+			const responses: (UnityResponse & {socket: Socket})[] = [];
+
+			const fetchPromises = servers.map((server) => {
+				return new Promise<void>((resolve) => {
+					const token = crypto.randomUUID();
+					const responseEvent = `unity:response`;
+					const timeoutId = setTimeout(() => {
+						server.off(responseEvent, onResponse);
+						responses.push({
+							code: 408,
+							message: 'Request Timeout',
+							data: null,
+							token,
+							socket: server
+						});
+						resolve();
+					}, timeout);
+
+					const onResponse = (responseData: UnityResponse) => {
+						if (responseData.token !== token) return;
+						clearTimeout(timeoutId);
+						responses.push({
+							...responseData,
+							socket: server
+						});
+						server.off(responseEvent, onResponse);
+						resolve();
+					};
+					server.on(responseEvent, onResponse);
+
+					server.emit('unity:command', {
+						cmd,
+						data,
+						token
+					});
+				});
+			});
+
+			await Promise.all(fetchPromises);
+			return responses;
+		}
+
+		return {
+			send,
+			fetch
+		}
+	}
 
 	// Socket.IO 연결 핸들러
 	io.on('connection', (socket: Socket) => {
@@ -316,8 +210,9 @@ export function startSocketServer(port: number = 7777) {
 			);
 
 			// Unity 서버에서 오는 이벤트들을 웹 콘솔로 전달
-			socket.on('command:response', (data: UnityResponsePayload) => {
+			socket.on('command:response', (data: string) => {
 				console.log(`[Relay] Unity → 웹: command:response`);
+				console.log(JSON.parse(data));
 				relayResponseToWeb('game:response', data, connectedClients);
 			});
 
@@ -354,7 +249,7 @@ export function startSocketServer(port: number = 7777) {
 			console.log(`[Room] 웹 콘솔이 'web' 채널에 참여했습니다: ${socket.id}`);
 		}
 
-		const handleUnityCommand = (commandSocket: Socket, data: CommandData | undefined) => {
+		const handleUnityCommand = (commandSocket: Socket, data: CommandData) => {
 			if (!data || typeof data.cmd !== 'string') {
 				commandSocket.emit('command:response', {
 					code: 400,
@@ -364,17 +259,17 @@ export function startSocketServer(port: number = 7777) {
 			}
 
 			const client = connectedClients.get(commandSocket.id);
-			const target = resolveCommandTarget(data, client?.clientType);
 
 			if (client?.clientType === 'web') {
-				if (target === 'unity') {
+				if (data.target === 'unity') {
 					console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
 					// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
-					relayCommandToUnity(commandSocket, data, unityServers);
+					unity(...data.targetServer).send(data.cmd, data.args);
+
 					return;
 				}
 
-				if (target === 'socketIO') {
+				if (data.target === 'socketIO') {
 					console.log(`[Command] unity:command 수신 (웹 → SocketIO): ${data.cmd}`);
 					// SocketIO 서버에서 처리
 					commandHandler.handleCommand(commandSocket, data);
@@ -407,45 +302,6 @@ export function startSocketServer(port: number = 7777) {
 			handleUnityCommand(socket, data);
 		});
 
-		// 웹 콘솔 → Unity 라우팅 통합 핸들러
-		socket.on('webToUnity', (payload: WebToUnityPayload) => {
-			const client = connectedClients.get(socket.id);
-			if (client?.clientType !== 'web') {
-				socket.emit('command:response', {
-					code: 403,
-					message: 'webToUnity 이벤트는 웹 콘솔만 사용할 수 있습니다.'
-				});
-				return;
-			}
-
-			if (!payload || typeof payload.cmd !== 'string') {
-				socket.emit('command:response', {
-					code: 400,
-					message: 'webToUnity 이벤트에는 cmd가 필요합니다.'
-				});
-				return;
-			}
-
-			const { cmd, data } = payload;
-
-			if (cmd === 'unity:command') {
-				handleUnityCommand(socket, data as CommandData);
-				return;
-			}
-
-			if (cmd === 'zones:list') {
-				const targetUnityId = (data as { targetUnityId?: string } | undefined)?.targetUnityId;
-				console.log(`[Command] webToUnity 수신 (zones:list)`);
-				relayToUnityServer(socket, 'zones:list', targetUnityId, {}, unityServers, 'zones');
-				return;
-			}
-
-			socket.emit('command:response', {
-				code: 404,
-				message: `지원하지 않는 webToUnity cmd 입니다: ${cmd}`
-			});
-		});
-
 		// Unity 서버 목록 요청 핸들러
 		socket.on('unity:list', () => {
 			socket.emit('unity:list', {
@@ -456,11 +312,6 @@ export function startSocketServer(port: number = 7777) {
 					DEFAULT_UNITY_ALIAS
 				)
 			});
-		});
-
-		// Zones 목록 요청 핸들러
-		socket.on('zones:list', (data: { targetUnityId?: string } = {}) => {
-			relayToUnityServer(socket, 'zones:list', data.targetUnityId, {}, unityServers, 'zones');
 		});
 
 		// Unity 서버 별칭 변경 핸들러
@@ -597,5 +448,13 @@ export function startSocketServer(port: number = 7777) {
 	console.log(`Starting game server on port ${port}`);
 	io.listen(port);
 
-	return {io, unityServers, webClients};
+	const getUnityServerListForRoute = () =>
+		getUnityServerList(
+			unityServers,
+			connectedClients,
+			unityServerAliases,
+			DEFAULT_UNITY_ALIAS
+		);
+
+	return { io, unityServers, webClients, unity, getUnityServerList: getUnityServerListForRoute };
 }

@@ -1,12 +1,7 @@
 // Types
 export type {
-	CommandData,
 	CommandTarget,
 	CommandResponse,
-	AuthPacket,
-	AuthResponseMessage,
-	MovePacket,
-	BulletPacket,
 	ClientType,
 	ConnectedClient,
 	CommandHandler

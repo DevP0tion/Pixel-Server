@@ -199,22 +199,14 @@ class SocketManager extends EventEmitter {
 		};
 	}
 
-	// 소켓 이벤트 전송 (명시적)
-	sendSocketEvent(event: string, ...args: unknown[]): boolean {
-		if (this.socket && this._isConnected) {
-			this.socket.emit(event, ...args);
-			return true;
-		}
-		return false;
-	}
-
-	// Unity 서버 대상으로 이벤트 전송 (webToUnity 래퍼)
-	sendUnityEvent(cmd: string, data: Record<string, unknown> = {}, ...targets: string[]) {
-		return this.sendSocketEvent('webToUnity', 
+	// Unity 서버 대상으로 이벤트 전송 (unity:command 래퍼)
+	sendUnityEvent(cmd: string, data: Record<string, any> = {}, ...targets: string[]) {
+		return this.socket?.emit('unity:command', 
 			{ 
-				target: targets && targets.length > 0 ? targets : this._unityServers.map((server) => server.id),
+				target: "unity",
+				targetServer: targets && targets.length > 0 ? targets : this._unityServers.map((server) => server.id),
 				cmd,
-				...data
+				args: data
 			}
 		);
 	}

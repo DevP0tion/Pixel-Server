@@ -11,7 +11,7 @@
 		handleWebCommand,
 		sendToServer
 	} from './command';
-	import type { UnityResponsePayload } from '$lib/server/socketIO';
+	import type { UnityResponse } from '$lib/server/socketIO';
 
 	// 상태 (로그는 logStore에서 관리)
 	let logs: LogEntry[] = $state(logStore.logs);
@@ -215,7 +215,7 @@
 
 		// Unity 서버에서 온 게임 응답
 		addEventHandler('game:response', (payload: string) => {
-			const response: UnityResponsePayload = JSON.parse(payload);
+			const response: UnityResponse = JSON.parse(payload);
 
 			const status = response.code === 100 ? '' : '✗';
 			addLog('game', `${status} ${response.message}`);

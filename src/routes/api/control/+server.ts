@@ -49,7 +49,7 @@ function handleUnityCommand({event, data}: SendToUnityData) {
   server.unityServers.forEach((socket, _) => {
     // 여기서 socket.emit(...) 등을 사용하여 Unity 서버에 명령을 보낼 수 있습니다.
 
-    socket.emit('unity:command', { command: event, data: data });
+    socket.emit('unity:command', { cmd: event, data: data });
   })
 
   return new Response('Unity command sent', { status: 200 });

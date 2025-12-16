@@ -6,55 +6,27 @@ import type { Socket } from 'socket.io';
  */
 export type CommandTarget = 'unity' | 'socketIO';
 
-export interface CommandData {
+export type CommandData = {
 	cmd: string;
 	// 명령을 전달할 대상 (미지정 시 기본 라우팅 규칙 적용)
-	target?: CommandTarget;
-	args?: Record<string, unknown>;
-}
+	args: Record<string, unknown>;
+} & ({ 
+		target: "unity"
+		targetServer: string[];
+	} | {
+		target: "socketIO"
+	} | {
+		target?: undefined
+	}
+)
 
 /**
  * 명령어 응답 형식
  */
-export interface CommandResponse {
+export type CommandResponse = {
 	code: number;
 	message: string;
 	data?: unknown;
-}
-
-/**
- * 인증 패킷 형식 (AuthPacket)
- */
-export interface AuthPacket {
-	username: string;
-	password: string;
-}
-
-/**
- * 인증 응답 형식 (AuthResponseMessage)
- */
-export interface AuthResponseMessage {
-	code: number;
-	message: string;
-}
-
-/**
- * 이동 패킷 형식 (MovePacket)
- */
-export interface MovePacket {
-	direction: { x: number; y: number };
-	canceled: boolean;
-}
-
-/**
- * 총알 패킷 형식 (BulletPacket)
- */
-export interface BulletPacket {
-	typeName: string;
-	teamName: string;
-	startPos: { x: number; y: number; z: number };
-	targetPos: { x: number; y: number; z: number };
-	damage: number;
 }
 
 /**
@@ -67,7 +39,7 @@ export type ClientType = 'unity' | 'web';
 /**
  * 연결된 클라이언트 정보
  */
-export interface ConnectedClient {
+export type ConnectedClient = {
 	socket: Socket;
 	id: string;
 	clientType: ClientType;
