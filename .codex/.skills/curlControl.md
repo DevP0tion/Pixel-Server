@@ -1,24 +1,34 @@
 ---
-name: curl control
-description: Briefly state what this skill updates and when to use it.
+name: curl-control
+description: Use the curl MCP tool to POST to http://localhost:5173/api/control following document/api/CURLControlAPI.md when asked for CURLControl.
 ---
 
-# How to update
-- List the source files to inspect for changes (paths/patterns).
-- Point to the target doc(s) and note sections or headers that must stay intact.
-- Describe how to append/update entries using the standard shape; clarify branching rules or enums to pick from.
-- Add a small fenced example of the base pattern if helpful for consistency.
-- Mention any checks (naming, fence closure, ordering) before finishing.
+# curl MCP tool
+- Verified `curl` MCP server (`@mcp-get-community/server-curl`) is available; use the MCP `curl` tool (not shell `curl`).
+- Always POST JSON to `http://localhost:5173/api/control` with `Content-Type: application/json`.
 
-```text
-# Example base pattern (edit/remove as needed)
-Key: ValueType
-field: string
-payload:
+# Request schema (document/api/CURLControlAPI.md)
+- Fields: `token` (use `.env` `control_token`), `action` (always `"socket"`), `target` (`"unity"` | `"webconsole"`), `event` (socket event name), `data` (object or array; `{}` when none).
+- Unity events: `status`, `ping`, `help`, `server:info`, `server:scenes`, `server:players`, `zones:list`, `zones:info` (requires `{ "zoneId": number }`).
+- Web console: `command:response` (or any socket event name) with `data: { code: number; message: string; data?: any }`.
+
+```bash
+# Body to pass to the MCP curl tool
 {
-  // fields here
+  "method": "POST",
+  "url": "http://localhost:5173/api/control",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "data": {
+    "token": "$env:control_token",
+    "action": "socket",
+    "target": "unity",        # unity | webconsole
+    "event": "status",        # e.g., status | ping | zones:info | command:response
+    "data": {}                # {} or payload like { "zoneId": 0 }
+  }
 }
 ```
 
 # Quick command
-`rg "<keyword>" <path>`
+`rg "api/control|control_token" src document`
