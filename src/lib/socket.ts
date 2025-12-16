@@ -10,15 +10,17 @@ export type UnityServerInfo = {
 	id: string;
 	connectedAt: string;
 	alias: string;
-}
+};
 
 // Zone 정보 타입
 export type ZoneInfo = {
+	id: number;
 	name: string;
+	position: { x: number; y: number; z: number };
+	isActive: boolean;
 	playerCount: number;
-	maxPlayers: number;
-	status: string;
-}
+	additionalInfo: string[];
+};
 
 // 소켓 상태 타입
 export type SocketState = {
@@ -26,7 +28,7 @@ export type SocketState = {
 	isUnityConnected: boolean;
 	clientId: string | null;
 	zones: ZoneInfo[];
-}
+};
 
 // 소켓 관리자 클래스
 class SocketManager extends EventEmitter {
@@ -201,14 +203,13 @@ class SocketManager extends EventEmitter {
 
 	// Unity 서버 대상으로 이벤트 전송 (unity:command 래퍼)
 	sendUnityEvent(cmd: string, data: Record<string, any> = {}, ...targets: string[]) {
-		return this.socket?.emit('unity:command', 
-			{ 
-				target: "unity",
-				targetServer: targets && targets.length > 0 ? targets : this._unityServers.map((server) => server.id),
-				cmd,
-				args: data
-			}
-		);
+		return this.socket?.emit('unity:command', {
+			target: 'unity',
+			targetServer:
+				targets && targets.length > 0 ? targets : this._unityServers.map((server) => server.id),
+			cmd,
+			args: data
+		});
 	}
 
 	// 재연결
@@ -238,7 +239,8 @@ class SocketManager extends EventEmitter {
 	unityServers(...id: string[]) {
 		const { _unityServers, sendUnityEvent } = this;
 
-		let servers = id.length === 0 ? _unityServers : _unityServers.filter((server) => id.includes(server.id));
+		let servers =
+			id.length === 0 ? _unityServers : _unityServers.filter((server) => id.includes(server.id));
 
 		const send = (cmd: string, data: Record<string, unknown> = {}) => {
 			return sendUnityEvent(cmd, data, ...id);

@@ -1,19 +1,21 @@
-import type { ZoneInfo } from '$lib/socket';
-import { randomUUID } from 'crypto';
 import { server } from 'src/hooks.server';
+import { _getServerZones } from './get.remote';
+import type { ZoneInfo } from '$lib/socket';
 
-export async function load ({ url }) {
+export async function load({ url }) {
 	const serverId = url.searchParams.get('serverId') || '';
 
-	// 서버 사이드에서 직접 Socket.IO로 Unity에 zones:list 요청
+	if (!serverId) {
+		return { zones: [], error: '서버 ID가 없습니다.' };
+	}
 
 	try {
-		const data: ZoneInfo[] = (await server.unity(serverId).fetch('zones:list', {}))[0].data
-		console.log('Fetched zones from Unity:', data);
+		const responses = await server.unity(serverId).fetch('zones:list', {});
+		const zones: ZoneInfo[] = JSON.parse(responses[0].data).zones;
 
-		return { zones: data };
+		return { zones };
 	} catch (error) {
 		console.error('Failed to fetch zones from Unity:', error);
 		return { zones: [], error: error instanceof Error ? error.message : 'Unknown error' };
 	}
-};
+}

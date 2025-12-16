@@ -1,60 +1,27 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { socketManager, type ZoneInfo } from '$lib/socket';
+	import { _getServerZones } from './get.remote';
+
+	const { data } = $props();
 
 	// 쿼리 파라미터에서 서버 정보 가져오기
-	let serverId = $derived($page.url.searchParams.get('serverId') || '');
-	let serverAlias = $derived($page.url.searchParams.get('serverAlias') || 'Unknown Server');
+	let serverId = $derived(page.url.searchParams.get('serverId') || '');
+	let serverAlias = $derived(page.url.searchParams.get('serverAlias') || 'Unknown Server');
 
 	// 상태
 	let isConnected = $state(false);
-	let zones: ZoneInfo[] = $state([]);
-	let isLoading = $state(true);
-	let errorMessage = $state('');
+	let zones: ZoneInfo[] = $derived(data.zones ?? []);
+	let isLoading = $derived(!data.zones?.length && !data.error);
+	let errorMessage = $derived(data.error ?? '');
 
 	// 이벤트 리스너 정리를 위한 배열
 	let eventCleanupFns: Array<() => void> = [];
 
-	// 이벤트 핸들러 등록
-	function setupSocketEventHandlers() {
-		// 이벤트 리스너 헬퍼 함수
-		function addEventHandler(event: string, handler: (...args: unknown[]) => void) {
-			socketManager.on(event, handler);
-			eventCleanupFns.push(() => socketManager.off(event, handler));
-		}
-
-		addEventHandler('connect', () => {
-			isConnected = true;
-			// 서버 ID가 있으면 Zones 목록 요청
-			if (serverId) {
-				requestZones();
-			}
-		});
-
-		addEventHandler('disconnect', () => {
-			isConnected = false;
-			zones = [];
-		});
-
-		// Zones 목록 응답
-		addEventHandler('zones:list', (data: unknown) => {
-			const zonesData = data as { zones?: ZoneInfo[]; code?: number; message?: string };
-			if (zonesData.zones) {
-				zones = zonesData.zones;
-				isLoading = false;
-				errorMessage = '';
-			} else if (zonesData.code && zonesData.code !== 100) {
-				console.error(`Zones 목록 요청 실패 (코드: ${zonesData.code}):`, zonesData.message);
-				errorMessage = zonesData.message || 'Zones 정보를 가져올 수 없습니다.';
-				isLoading = false;
-			}
-		});
-	}
-
 	// Zones 목록 요청
-	function requestZones() {
+	async function requestZones() {
 		console.log('Zones 목록 요청 중...');
 		if (!serverId) {
 			errorMessage = '서버 ID가 없습니다.';
@@ -64,17 +31,20 @@
 
 		isLoading = true;
 		errorMessage = '';
-		socketManager.unityServers(serverId).send('zones:list');
+		try {
+			zones = await _getServerZones({ serverId });
+		} catch (err) {
+			console.error('Zones 정보를 가져오는 중 오류 발생:', err);
+			errorMessage = err instanceof Error ? err.message : 'Zones 정보를 가져올 수 없습니다.';
+			zones = [];
+		} finally {
+			isLoading = false;
+		}
 	}
 
 	// 뒤로 가기
 	function goBack() {
 		goto('/dashboard');
-	}
-
-	// Zone 플레이어 비율 계산
-	function getZoneOccupancyPercent(zone: ZoneInfo): number {
-		return zone.maxPlayers > 0 ? (zone.playerCount / zone.maxPlayers) * 100 : 0;
 	}
 
 	onMount(() => {
@@ -84,18 +54,8 @@
 			return;
 		}
 
-		// 현재 연결 상태 동기화
-		isConnected = socketManager.isConnected;
-
-		// 이벤트 핸들러 등록
-		setupSocketEventHandlers();
-
-		// 아직 연결되지 않은 경우 연결 시도
-		if (isConnected) {
-			requestZones();
-		} else {
-			console.log('소켓이 연결되지 않음, 연결 시도 중...');
-			socketManager.connect();
+		if (zones.length === 0 && !errorMessage) {
+			void requestZones();
 		}
 	});
 
@@ -122,7 +82,7 @@
 			</div>
 		</div>
 		<div class="header-right">
-			<button class="btn btn-primary" onclick={requestZones} disabled={!isConnected}>
+			<button class="btn btn-primary" onclick={requestZones} disabled={!serverId || isLoading}>
 				새로고침
 			</button>
 		</div>
@@ -159,18 +119,18 @@
 						<div class="zone-card">
 							<div class="zone-header">
 								<h3 class="zone-name">{zone.name}</h3>
-								<span class="zone-status" class:active={zone.status === 'active'}
-									>{zone.status}</span
+								<span class="zone-status" class:active={zone.isActive}
+									>{zone.isActive ? 'Active' : 'Inactive'}</span
 								>
 							</div>
 							<div class="zone-stats">
 								<div class="stat-item">
 									<span class="stat-label">플레이어:</span>
-									<span class="stat-value">{zone.playerCount} / {zone.maxPlayers}</span>
+									<span class="stat-value">{zone.playerCount}</span>
 								</div>
-								<div class="progress-bar">
+								<!-- <div class="progress-bar">
 									<div class="progress-fill" style="width: {getZoneOccupancyPercent(zone)}%"></div>
-								</div>
+								</div> -->
 							</div>
 						</div>
 					{/each}

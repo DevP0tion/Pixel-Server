@@ -14,14 +14,14 @@ type UnityServerInfo = {
 	id: string;
 	connectedAt: string;
 	alias: string;
-}
+};
 
 export type UnityResponse = {
 	code: number;
 	message: string;
-	data: any;
+	data: string;
 	token: string;
-}
+};
 
 // Unity 서버 기본 별칭
 const DEFAULT_UNITY_ALIAS = 'Game Server';
@@ -41,7 +41,7 @@ function getUnityServerList(
 	DEFAULT_UNITY_ALIAS: string
 ): UnityServerInfo[] {
 	const list: UnityServerInfo[] = [];
-	
+
 	unityServers.forEach((socket, id) => {
 		const client = connectedClients.get(id);
 		if (client) {
@@ -103,23 +103,27 @@ export function startSocketServer(port: number = 7777) {
 	// 기본 명령어 등록 (commands.ts에서 로드)
 	loadCommands(commandHandler, connectedClients);
 
-	// 
+	//
 	function unity(...unityServerNames: string[]) {
-		const servers = Array.from(unityServers.values().filter((socket, _) => unityServerNames.includes(socket.id)));
+		const servers = Array.from(
+			unityServers.values().filter((socket, _) => unityServerNames.includes(socket.id))
+		);
 
 		function send(cmd: string, data: any = {}) {
 			servers.forEach((server) => {
-				server.emit('unity:command',
-					{
-						cmd: cmd,
-						data: data
-					}
-				);
+				server.emit('unity:command', {
+					cmd: cmd,
+					data: data
+				});
 			});
 		}
 
-		async function fetch(cmd: string, data: any = {}, timeout: number = 5000): Promise<(UnityResponse & {socket: Socket})[]> {
-			const responses: (UnityResponse & {socket: Socket})[] = [];
+		async function fetch(
+			cmd: string,
+			data: any = {},
+			timeout: number = 5000
+		): Promise<(UnityResponse & { socket: Socket })[]> {
+			const responses: (UnityResponse & { socket: Socket })[] = [];
 
 			const fetchPromises = servers.map((server) => {
 				return new Promise<void>((resolve) => {
@@ -130,14 +134,15 @@ export function startSocketServer(port: number = 7777) {
 						responses.push({
 							code: 408,
 							message: 'Request Timeout',
-							data: null,
+							data: '',
 							token,
 							socket: server
 						});
 						resolve();
 					}, timeout);
 
-					const onResponse = (responseData: UnityResponse) => {
+					const onResponse = (res: string) => {
+						const responseData = JSON.parse(res);
 						if (responseData.token !== token) return;
 						clearTimeout(timeoutId);
 						responses.push({
@@ -158,13 +163,14 @@ export function startSocketServer(port: number = 7777) {
 			});
 
 			await Promise.all(fetchPromises);
+
 			return responses;
 		}
 
 		return {
 			send,
 			fetch
-		}
+		};
 	}
 
 	// Socket.IO 연결 핸들러
@@ -190,7 +196,7 @@ export function startSocketServer(port: number = 7777) {
 			unityServers.set(socket.id, socket);
 			socket.join(SocketRooms.UnityServers);
 
-						// 기본 별칭 설정
+			// 기본 별칭 설정
 			unityServerAliases.set(socket.id, DEFAULT_UNITY_ALIAS);
 
 			// 모든 웹 콘솔에 Unity 서버 연결 알림
@@ -210,9 +216,8 @@ export function startSocketServer(port: number = 7777) {
 			);
 
 			// Unity 서버에서 오는 이벤트들을 웹 콘솔로 전달
-			socket.on('command:response', (data: string) => {
+			socket.on('unity:response', (data: string) => {
 				console.log(`[Relay] Unity → 웹: command:response`);
-				console.log(JSON.parse(data));
 				relayResponseToWeb('game:response', data, connectedClients);
 			});
 
@@ -449,12 +454,7 @@ export function startSocketServer(port: number = 7777) {
 	io.listen(port);
 
 	const getUnityServerListForRoute = () =>
-		getUnityServerList(
-			unityServers,
-			connectedClients,
-			unityServerAliases,
-			DEFAULT_UNITY_ALIAS
-		);
+		getUnityServerList(unityServers, connectedClients, unityServerAliases, DEFAULT_UNITY_ALIAS);
 
 	return { io, unityServers, webClients, unity, getUnityServerList: getUnityServerListForRoute };
 }
