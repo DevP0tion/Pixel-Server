@@ -146,7 +146,7 @@ export function sendToServer(
 
 	if (commandTarget === 'socketIO') {
 		// SocketIO 서버 명령어 (target 속성을 포함해 단일 엔드포인트로 전달)
-		socketManager.sendSocketEvent('unity:command', { target: 'socketIO', cmd, args });
+		socketManager.sendUnityEvent('unity:command', { target: 'socketIO', cmd, args });
 		addLog('socketio', `SocketIO 서버 명령어: ${cmd}`);
 	} else {
 		// Unity 서버 명령어 (unity:command 이벤트로 전송)
