@@ -101,8 +101,8 @@ ALLOWED_ORIGINS=http://localhost:3000,http://example.com
 
 | 타입    | 설명               | Room   |
 | ------- | ------------------ | ------ |
-| `web`   | 웹 콘솔 클라이언트 | `web`  |
-| `unity` | Unity 게임 서버    | `game` |
+| `web`   | 웹 콘솔 클라이언트 | `web_clients` |
+| `unity` | Unity 게임 서버    | `unity_servers` |
 
 ### 클라이언트 정보 인터페이스
 
@@ -217,7 +217,7 @@ Unity 서버 별칭이 변경되었을 때 모든 웹 클라이언트에 전송�
 
 #### `command:response`
 
-명령어 실행 결과를 전송합니다.
+명령어 실행 결과를 전송합니다. (Svelte/Socket.IO에서 직접 처리한 응답)
 
 ```typescript
 // 페이로드
@@ -228,30 +228,16 @@ Unity 서버 별칭이 변경되었을 때 모든 웹 클라이언트에 전송�
 }
 ```
 
-#### `command:relayed`
+#### `game:response`
 
-명령어가 Unity 서버로 전달되었음을 알립니다.
+Unity 서버에서 온 `command:response`를 웹 클라이언트에 그대로 전달합니다.
 
 ```typescript
 // 페이로드
-{
-  code: number;            // 응답 코드 (100: 성공)
-  message: string;         // 전달 메시지
-  targetUnityIds: string[]; // 전달된 Unity 서버 ID 목록
-  data: {                  // Unity에 전송된 데이터
-    cmd: string;
-    data: Record<string, unknown>;
-  }
-}
+// Unity가 보낸 JSON 문자열(예: CommandResponse). 필요 시 JSON.parse(...) 호출
 ```
 
-#### `game:response`
-
-Unity 서버에서 온 명령어 응답을 웹 클라이언트에 전달합니다.
-
-```typescript
-// 페이로드 - Unity 서버에서 정의한 형식
-```
+> 서버의 `unity().fetch(...)`를 사용할 때는 Unity가 동일한 형식에 `token`을 포함해 `unity:response` 이벤트로 응답해야 합니다. (웹 클라이언트로 브로드캐스트되지 않음)
 
 #### `game:log`
 
@@ -297,16 +283,15 @@ Svelte 서버에서 직접 처리할 명령어를 전송합니다.
 
 Unity 서버로 전달할 명령어를 전송합니다.
 
-**웹 클라이언트가 전송하는 경우:** Unity 서버로 릴레이됩니다.
+**웹 클라이언트가 전송하는 경우:** `target`에 따라 Unity로 전달하거나 Socket.IO에서 직접 처리합니다.
 
 ```typescript
 // 페이로드
 {
   cmd: string;                    // 명령어 이름
-  args?: {
-    targetUnityId?: string;       // 특정 Unity 서버 ID (선택, 없으면 전체 브로드캐스트)
-    [key: string]: unknown;       // 기타 인자
-  }
+  target?: 'unity' | 'socketIO';  // 기본값: 'unity'
+  targetServer?: string[];        // 선택: 특정 Unity 서버 ID 목록 (없으면 전체 전달)
+  args?: Record<string, unknown>; // 명령 인자
 }
 ```
 
@@ -366,6 +351,8 @@ Unity 서버의 별칭을 변경합니다. (웹 클라이언트만 가능)
 ```typescript
 interface CommandData {
 	cmd: string; // 명령어 이름
+	target?: CommandTarget; // 'unity' | 'socketIO' (기본값: unity)
+	targetServer?: string[]; // 선택: 특정 Unity 서버 ID 목록
 	args?: Record<string, unknown>; // 명령어 인자
 }
 ```
@@ -454,6 +441,12 @@ interface UnityServerInfo {
 
 ```typescript
 type ClientType = 'unity' | 'web';
+```
+
+### CommandTarget
+
+```typescript
+type CommandTarget = 'unity' | 'socketIO';
 ```
 
 ### AuthPacket
@@ -647,26 +640,21 @@ public class MyGameCommands : MonoBehaviour
 // 모든 Unity 서버로 브로드캐스트
 socket.emit('unity:command', {
 	cmd: 'game:pause',
+	target: 'unity',
 	args: { reason: 'maintenance' }
 });
 
 // 특정 Unity 서버에만 전송
 socket.emit('unity:command', {
 	cmd: 'game:pause',
-	args: {
-		targetUnityId: 'abc123',
-		reason: 'maintenance'
-	}
-});
-
-// 전달 확인
-socket.on('command:relayed', (response) => {
-	console.log('명령어 전달됨:', response.targetUnityIds);
-	console.log('전달된 데이터:', response.data);
+	target: 'unity',
+	targetServer: ['abc123'],
+	args: { reason: 'maintenance' }
 });
 
 // Unity 서버로부터의 응답 수신
-socket.on('game:response', (response) => {
+socket.on('game:response', (raw) => {
+	const response = typeof raw === 'string' ? JSON.parse(raw) : raw;
 	console.log('Unity 응답:', response);
 });
 ```
@@ -757,7 +745,8 @@ const socket = socketManager.connect();
 console.log('연결 상태:', socketManager.isConnected);
 console.log('Unity 연결 상태:', socketManager.isUnityConnected);
 console.log('클라이언트 ID:', socketManager.clientId);
-console.log('Unity 서버 목록:', socketManager.unityServers);
+const { servers } = socketManager.unityServers();
+console.log('Unity 서버 목록:', servers);
 
 // 상태 변경 이벤트 구독
 socketManager.on('stateChange', (state) => {
@@ -774,7 +763,9 @@ socketManager.on('unity:connected', (data) => {
 });
 
 // 명령어 전송
-socketManager.sendSocketEvent('svelte:command', { cmd: 'ping' });
+socketManager.getSocket()?.emit('svelte:command', { cmd: 'ping' }); // Svelte 서버 핑
+socketManager.unityServers().send('zones:list');                    // 모든 Unity 서버에 zones:list
+socketManager.unityServers('abc123').send('ping');                  // 특정 Unity 서버에 ping
 
 // 재연결
 socketManager.reconnect();
@@ -798,8 +789,8 @@ socketManager.disconnect();
 ### 다중 Unity 서버 지원
 
 - 여러 Unity 서버가 동시에 연결될 수 있습니다.
-- `targetUnityId`를 지정하지 않으면 모든 Unity 서버로 명령어가 브로드캐스트됩니다.
-- 특정 서버에만 명령어를 보내려면 `args.targetUnityId`를 지정하세요.
+- `targetServer`를 지정하지 않으면 모든 Unity 서버로 명령어가 브로드캐스트됩니다.
+- 특정 서버에만 명령어를 보내려면 `targetServer: ['소켓ID']`를 payload에 포함하세요.
 
 ### 이벤트 전달 (Relay)
 
@@ -824,7 +815,7 @@ Unity에서 수신하는 명령어 형식은 다음과 같습니다:
 }
 ```
 
-웹 콘솔에서 `unity:command` 이벤트로 전송할 때, `args.targetUnityId`는 자동으로 제거되고 나머지 인자만 `data`로 전달됩니다.
+웹 콘솔에서 `unity:command` 이벤트로 전송할 때 `targetServer`는 라우팅에만 사용되며, `args`는 수정 없이 Unity에 전달됩니다.
 
 ### 웹 콘솔 명령어 파싱
 

@@ -3,7 +3,7 @@ Section: To Unity | From Unity | To Web | From Web
 ```
 Room: SocketRooms.UnityServers | SocketRooms.WebClients
 event: string
-payload: payload interface
+payload: payload interface (forwarded as-is unless noted)
 ```
 
 # Example
@@ -27,16 +27,10 @@ Room: SocketRooms.UnityServers
 event: unity:command
 payload:
 {
-  cmd: string;
-  data: Record<string, unknown>; // args from web command (targetUnityId removed)
+  cmd: string;                           // 명령 이름 (예: 'zones:list')
+  data?: Record<string, unknown>;        // 전달할 데이터
+  token?: string;                        // 선택: 서버 fetch() 호출 시 응답 매칭용
 }
-```
-
-```typescript
-Room: SocketRooms.UnityServers
-event: zones:list
-payload:
-{}
 ```
 
 ```typescript
@@ -63,7 +57,22 @@ payload:
   code: number;
   message: string;
   data: any;
+  token?: string; // unity.fetch() 응답 매칭용 (선택)
 }
+// Unity → 서버에서는 JSON 문자열로 전달되며 웹으로는 game:response로 릴레이됩니다.
+```
+
+```typescript
+Room: SocketRooms.UnityServers
+event: unity:response
+payload:
+{
+  code: number;
+  message: string;
+  data: any;
+  token: string; // 서버가 보낸 token을 그대로 반환
+}
+// 서버의 unity().fetch(...) 호출에 대한 정식 응답 채널
 ```
 
 ```typescript
@@ -200,20 +209,9 @@ payload:
 {
   code: number;
   message: string;
-  data?: any;
+  data?: unknown;
 }
-```
-
-```typescript
-Room: SocketRooms.WebClients
-event: command:relayed
-payload:
-{
-  code: number;
-  message: string;
-  targetUnityIds: string[];
-  data: { cmd: string; data: Record<string, unknown>; };
-}
+// Svelte 서버에서 처리한 명령어 응답 (ping, status 등)
 ```
 
 ```typescript
@@ -221,9 +219,8 @@ Room: SocketRooms.WebClients
 event: game:response
 payload:
 {
-  code: number;
-  message: string;
-  data: any;
+  // Unity가 보낸 command:response JSON 문자열 그대로 전달됨
+  // 필요 시 클라이언트에서 JSON.parse(...)로 변환
 }
 ```
 
@@ -281,7 +278,6 @@ event: svelte:command
 payload:
 {
   cmd: string;
-  target?: 'unity' | 'socketIO';
   args?: Record<string, unknown>;
 }
 ```
@@ -291,19 +287,10 @@ Room: SocketRooms.WebClients
 event: unity:command
 payload:
 {
-  cmd: string;
-  target?: 'unity' | 'socketIO';
-  args?: Record<string, unknown>; // args.targetUnityId optional for routing to a specific Unity server
-}
-```
-
-```typescript
-Room: SocketRooms.WebClients
-event: webToUnity
-payload:
-{
-  cmd: 'unity:command' | 'zones:list';
-  data: CommandData | { targetUnityId?: string };
+  cmd: string;                           // Unity로 전달할 명령
+  target?: 'unity' | 'socketIO';         // 기본값: 'unity'
+  targetServer?: string[];               // 선택: 특정 Unity 서버 ID 목록 (없으면 전체)
+  args?: Record<string, unknown>;        // 명령 인자
 }
 ```
 
@@ -312,15 +299,6 @@ Room: SocketRooms.WebClients
 event: unity:list
 payload:
 {}
-```
-
-```typescript
-Room: SocketRooms.WebClients
-event: zones:list
-payload:
-{
-  targetUnityId?: string;
-}
 ```
 
 ```typescript

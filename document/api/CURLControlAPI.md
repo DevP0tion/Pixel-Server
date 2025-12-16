@@ -1,155 +1,59 @@
-# API Format
-Section: To Unity | To Web
-```typescript
-token: .env (control_token) string
-action: "socket"
-target: "unity" | "webconsole"
-event: string
-data: (json || array) string
-```
+# Control API (POST /api/control)
 
-# Example
+SvelteKit 라우트 `/api/control`로 외부 시스템(AI 등)이 Socket.IO로 이벤트를 강제 발송할 때 사용합니다.
 
-(To Unity Section)
+## 요청 형식
+
 ```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "zones:info"
-data: {
-  zoneId: 0
+{
+  token: string;                     // .env의 control_token 값과 일치해야 함
+  action: 'socket';                  // 현재 지원되는 유일한 액션
+  target: 'unity' | 'webconsole';    // 전송 대상
+  event: string;                     // Unity 명령 또는 웹 이벤트 이름
+  data?: unknown;                    // 전달할 페이로드 (그대로 전달됨)
 }
 ```
 
-## To Unity
+> `Content-Type: application/json` 헤더가 필요합니다.
 
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "status"
-data: {}
-// Response: { online: boolean; serverTime: string; uptime: number; }
+## 동작
+
+- `target: "unity"`: 연결된 모든 Unity 소켓에 `unity:command` 이벤트를 전송합니다.
+  - 페이로드: `{ cmd: event, data }` (Unity에서 그대로 수신)
+- `target: "webconsole"`: 모든 웹 콘솔 소켓에 `<event>` 이름으로 `data`를 그대로 브로드캐스트합니다.
+
+## 응답 코드
+
+- `200 OK` : 명령 전송 성공
+- `401 Unauthorized` : `token` 불일치
+- `501 Not Implemented` : 알 수 없는 action/target
+
+## 예제
+
+### Unity에 명령 보내기
+
+```bash
+curl -X POST http://localhost:5173/api/control ^
+  -H "Content-Type: application/json" ^
+  -d "{ \
+    \"token\": \"${CONTROL_TOKEN}\", \
+    \"action\": \"socket\", \
+    \"target\": \"unity\", \
+    \"event\": \"ping\", \
+    \"data\": {} \
+  }"
 ```
 
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "ping"
-data: {}
-// Response: { timestamp: number; } // pong echo (Unix ms)
-```
+### 웹 콘솔에 브로드캐스트
 
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "help"
-data: {}
-// Response: string[] // registered command list
-```
-
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "server:info"
-data: {}
-// Response: {
-//   name: string;
-//   version: string;
-//   unityVersion: string;
-//   platform: string;
-//   uptime: number;
-//   systemMemory: number;
-//   graphicsDevice: string;
-// }
-```
-
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "server:scenes"
-data: {}
-// Response: Array<{
-//   name: string;
-//   path: string;
-//   isLoaded: boolean;
-//   buildIndex: number;
-// }>
-```
-
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "server:players"
-data: {}
-// Response: Array<{
-//   username: string;
-//   ipAddress: string;
-//   connectedAt: string; // ISO 8601
-// }>
-```
-
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "zones:list"
-data: {}
-// Response: {
-//   count: number;
-//   zones: Array<{
-//     id: number;
-//     name: string;
-//     position: { x: number; y: number; z: number; };
-//     isActive: boolean;
-//     playerCount: number;
-//   }>;
-// }
-```
-
-```typescript
-token: control_token
-action: "socket"
-target: "unity"
-event: "zones:info"
-data: {
-  zoneId: number;
-}
-// Response: {
-//   id: number;
-//   name: string;
-//   position: { x: number; y: number; z: number; };
-//   isActive: boolean;
-//   objects: Array<{
-//     name: string;
-//     type: string;
-//     position: { x: number; y: number; z: number; };
-//   }>;
-//   players: Array<{
-//     username: string;
-//     ipAddress: string;
-//     position: { x: number; y: number; z: number; };
-//   }>;
-// }
-// Errors: 400 (missing zoneId) | 404 (zone not found)
-```
-
-## To Web Console
-
-```typescript
-token: control_token
-action: "socket"
-target: "webconsole"
-event: "command:response" // or any SocketIO event name for web clients
-data: {
-  code: number;
-  message: string;
-  data?: any;
-}
-// Payload is forwarded as-is to connected web consoles
+```bash
+curl -X POST http://localhost:5173/api/control ^
+  -H "Content-Type: application/json" ^
+  -d "{ \
+    \"token\": \"${CONTROL_TOKEN}\", \
+    \"action\": \"socket\", \
+    \"target\": \"webconsole\", \
+    \"event\": \"command:response\", \
+    \"data\": { \"code\": 101, \"message\": \"AI broadcast\" } \
+  }"
 ```
