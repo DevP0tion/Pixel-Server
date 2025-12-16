@@ -15,6 +15,14 @@ const config = {
 		adapter: adapter(),
 		alias: {
 			'src/hooks.server': 'src/hooks.server.ts'
+		},
+		experimental: {
+			remoteFunctions: true
+		},
+	},
+	compilerOptions: {
+		experimental: {
+			async: true
 		}
 	}
 };
