@@ -11,7 +11,7 @@ export async function load({ url }) {
 
 	try {
 		const responses = await server.unity(serverId).fetch('zones:list', {});
-		const zones: ZoneInfo[] = JSON.parse(responses[0].data).zones;
+		const zones: ZoneInfo[] = JSON.parse(responses[0].data);
 
 		return { zones };
 	} catch (error) {

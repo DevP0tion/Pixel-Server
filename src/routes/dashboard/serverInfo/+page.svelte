@@ -128,10 +128,20 @@
 									<span class="stat-label">플레이어:</span>
 									<span class="stat-value">{zone.playerCount}</span>
 								</div>
-								<!-- <div class="progress-bar">
-									<div class="progress-fill" style="width: {getZoneOccupancyPercent(zone)}%"></div>
-								</div> -->
 							</div>
+							{#if zone.additionalInfo?.length}
+								<div class="additional-info">
+									<div class="info-title">추가 정보</div>
+									<ul>
+										{#each zone.additionalInfo as info, index (index)}
+											<li>
+												<span class="dot"></span>
+												<span class="info-text">{info}</span>
+											</li>
+										{/each}
+									</ul>
+								</div>
+							{/if}
 						</div>
 					{/each}
 				</div>
@@ -140,175 +150,416 @@
 	</main>
 </div>
 
-<style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	}
+<style lang="scss">
+	@use 'sass:color';
 
-	.server-info-container {
-		display: flex;
-		flex-direction: column;
-		min-height: 100vh;
-		background-color: #1a1a2e;
-		color: #ffffff;
-	}
+	$bg-main: #0d1329;
+	$bg-surface: #111a32;
+	$bg-card: #0f1c3a;
+	$panel-border: #1f2a4a;
+	$text: #e7eefc;
+	$text-muted: #9fb0d5;
 
-	/* 헤더 */
-	.header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 16px 24px;
-		background-color: #16213e;
-		border-bottom: 1px solid #0f3460;
-	}
+	$accent-blue: #3b82f6;
+	$accent-cyan: #06b6d4;
+	$accent-orange: #f59e0b;
+	$accent-green: #10b981;
+	$accent-red: #ef4444;
 
-	.header-left {
-		display: flex;
-		align-items: center;
-		gap: 16px;
-	}
-
-	.header h1 {
-		margin: 0;
-		font-size: 1.5rem;
-		font-weight: bold;
-	}
-
-	.header-right {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-
-	.server-badge {
-		display: flex;
-		align-items: center;
-		gap: 8px;
+	%pill {
 		padding: 6px 12px;
-		background-color: #1a1a2e;
-		border-radius: 6px;
-		border: 1px solid #0f3460;
+		border-radius: 999px;
+		font-size: 0.85rem;
+		font-weight: 700;
+		letter-spacing: 0.01em;
 	}
 
-	.server-name {
-		font-size: 0.875rem;
-		color: #f39c12;
-		font-weight: 600;
+	%card {
+		background: linear-gradient(
+			160deg,
+			color.adjust($bg-surface, $lightness: 4%),
+			color.adjust($bg-card, $lightness: -2%)
+		);
+		border: 1px solid $panel-border;
+		border-radius: 16px;
+		box-shadow: 0 14px 50px rgba(0, 0, 0, 0.35);
 	}
 
-	.status-indicator {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background-color: #e74c3c;
-	}
-
-	.status-indicator.connected {
-		background-color: #2ecc71;
-	}
-
-	/* 버튼 */
-	.btn {
-		padding: 8px 16px;
-		border: none;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition:
-			background-color 0.2s,
-			transform 0.1s;
-	}
-
-	.btn:hover:not(:disabled) {
-		transform: translateY(-1px);
-	}
-
-	.btn:active:not(:disabled) {
-		transform: translateY(0);
-	}
-
-	.btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.btn-primary {
-		background-color: #3498db;
-		color: white;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		background-color: #2980b9;
-	}
-
-	.btn-back {
-		background-color: #7f8c8d;
-		color: white;
-	}
-
-	.btn-back:hover {
-		background-color: #6c7a7d;
-	}
-
-	/* 메인 콘텐츠 */
-	.main-content {
-		flex: 1;
-		padding: 24px;
-	}
-
-	/* 섹션 */
-	.section {
-		background-color: #16213e;
-		border-radius: 12px;
-		padding: 20px;
-		border: 1px solid #0f3460;
-	}
-
-	.section-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 20px;
-	}
-
-	.section-header h2 {
-		margin: 0;
-		font-size: 1.25rem;
-		font-weight: 600;
-	}
-
-	.server-count {
-		font-size: 0.875rem;
-		color: #2ecc71;
-		background-color: rgba(46, 204, 113, 0.15);
-		padding: 4px 12px;
-		border-radius: 12px;
-	}
-
-	/* 상태 표시 */
-	.loading-state,
-	.empty-state,
-	.error-state {
+	%state-block {
+		@extend %card;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		padding: 48px 24px;
-		color: #7f8c8d;
+		text-align: center;
+		gap: 12px;
+		border-style: dashed;
+		border-color: color.adjust($panel-border, $lightness: 12%);
+		color: $text-muted;
+
+		p {
+			margin: 0;
+			font-size: 1rem;
+		}
 	}
 
-	.spinner {
-		width: 40px;
-		height: 40px;
-		border: 4px solid #0f3460;
-		border-top: 4px solid #3498db;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-		margin-bottom: 16px;
+	:global(body) {
+		margin: 0;
+		padding: 0;
+		background-color: $bg-main;
+		color: $text;
+		font-family:
+			'Space Grotesk',
+			'Noto Sans KR',
+			'Segoe UI',
+			-apple-system,
+			system-ui,
+			sans-serif;
+	}
+
+	.server-info-container {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		padding: 12px 20px 32px;
+		background:
+			radial-gradient(circle at 20% 20%, rgba($accent-blue, 0.08), transparent 35%),
+			radial-gradient(circle at 80% 10%, rgba($accent-cyan, 0.08), transparent 30%),
+			$bg-main;
+
+		.header {
+			@extend %card;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 12px;
+			padding: 16px 18px;
+			backdrop-filter: blur(4px);
+
+			h1 {
+				margin: 0;
+				font-size: 1.4rem;
+				font-weight: 800;
+				letter-spacing: -0.02em;
+			}
+
+			.header-left {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				flex-wrap: wrap;
+
+				.server-badge {
+					@extend %pill;
+					display: flex;
+					align-items: center;
+					gap: 10px;
+					background: rgba($bg-card, 0.6);
+					border: 1px solid $panel-border;
+					box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+				}
+
+				.status-indicator {
+					width: 12px;
+					height: 12px;
+					border-radius: 50%;
+					background-color: $accent-red;
+					box-shadow: 0 0 0 6px rgba($accent-red, 0.12);
+
+					&.connected {
+						background-color: $accent-green;
+						box-shadow: 0 0 0 6px rgba($accent-green, 0.18);
+					}
+				}
+
+				.server-name {
+					font-size: 0.95rem;
+					color: $accent-orange;
+					font-weight: 700;
+				}
+			}
+
+			.header-right {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+		}
+
+		.btn {
+			padding: 9px 14px;
+			border: 1px solid transparent;
+			border-radius: 12px;
+			font-size: 0.95rem;
+			font-weight: 700;
+			background: rgba($text, 0.04);
+			color: $text;
+			cursor: pointer;
+			transition:
+				transform 0.15s ease,
+				box-shadow 0.25s ease,
+				background-color 0.2s ease,
+				border-color 0.2s ease,
+				opacity 0.2s ease;
+
+			&:hover:not(:disabled) {
+				transform: translateY(-1px);
+				box-shadow: 0 10px 32px rgba(0, 0, 0, 0.3);
+				background: rgba($text, 0.07);
+			}
+
+			&:active:not(:disabled) {
+				transform: translateY(0);
+				box-shadow: none;
+			}
+
+			&:disabled {
+				opacity: 0.55;
+				cursor: not-allowed;
+			}
+
+			&.btn-primary {
+				background: linear-gradient(135deg, $accent-blue, $accent-cyan);
+				color: #0b1227;
+				border-color: color.adjust($accent-blue, $lightness: -10%);
+				text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+
+				&:hover:not(:disabled) {
+					box-shadow: 0 12px 40px rgba($accent-blue, 0.35);
+				}
+			}
+
+			&.btn-back {
+				background: rgba($accent-orange, 0.12);
+				color: $accent-orange;
+				border-color: color.adjust($accent-orange, $lightness: -8%);
+
+				&:hover:not(:disabled) {
+					border-color: color.adjust($accent-orange, $lightness: 4%);
+				}
+			}
+		}
+
+		.main-content {
+			flex: 1;
+			width: 100%;
+			max-width: 1200px;
+			align-self: center;
+			padding: 8px 0 0;
+		}
+
+		.section {
+			@extend %card;
+			padding: 20px;
+			border: 1px solid color.adjust($panel-border, $lightness: 6%);
+
+			.section-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 12px;
+				margin-bottom: 18px;
+
+				h2 {
+					margin: 0;
+					font-size: 1.2rem;
+					font-weight: 700;
+				}
+
+				.server-count {
+					@extend %pill;
+					background: rgba($accent-green, 0.16);
+					border: 1px solid rgba($accent-green, 0.45);
+					color: $accent-green;
+				}
+			}
+		}
+
+		.loading-state,
+		.empty-state,
+		.error-state {
+			@extend %state-block;
+		}
+
+		.loading-state {
+			color: $text-muted;
+		}
+
+		.spinner {
+			width: 42px;
+			height: 42px;
+			border: 4px solid $panel-border;
+			border-top: 4px solid $accent-blue;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+			margin-bottom: 10px;
+		}
+
+		.empty-icon,
+		.error-icon {
+			font-size: 2.4rem;
+			margin-bottom: 6px;
+		}
+
+		.error-state {
+			color: $accent-red;
+			border-color: rgba($accent-red, 0.4);
+
+			.error-icon {
+				filter: drop-shadow(0 6px 18px rgba($accent-red, 0.25));
+			}
+		}
+
+		.loading-state p,
+		.empty-state p,
+		.error-state p {
+			color: inherit;
+		}
+
+		.zones-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+			gap: 14px;
+		}
+
+		.zone-card {
+			@extend %card;
+			padding: 14px;
+			border: 1px solid color.adjust($panel-border, $lightness: 10%);
+			background: linear-gradient(
+				160deg,
+				color.adjust($bg-card, $lightness: 4%),
+				color.adjust($bg-card, $lightness: -3%)
+			);
+			transition:
+				border-color 0.2s ease,
+				transform 0.16s ease,
+				box-shadow 0.25s ease;
+
+			&:hover {
+				border-color: $accent-blue;
+				transform: translateY(-2px);
+				box-shadow: 0 16px 42px rgba($accent-blue, 0.25);
+			}
+
+			.zone-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 10px;
+				margin-bottom: 10px;
+
+				.zone-name {
+					margin: 0;
+					font-size: 1.05rem;
+					font-weight: 700;
+					color: $accent-blue;
+					text-shadow: 0 0 10px rgba($accent-blue, 0.18);
+				}
+
+				.zone-status {
+					@extend %pill;
+					background: rgba($text, 0.06);
+					border: 1px solid $panel-border;
+					color: $text-muted;
+					text-transform: uppercase;
+					font-size: 0.72rem;
+					letter-spacing: 0.06em;
+
+					&.active {
+						background: rgba($accent-green, 0.12);
+						border-color: rgba($accent-green, 0.6);
+						color: $accent-green;
+					}
+				}
+			}
+
+			.zone-stats {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+
+				.stat-item {
+					display: flex;
+					justify-content: space-between;
+					font-size: 0.92rem;
+				}
+
+				.stat-label {
+					color: $text-muted;
+				}
+
+				.stat-value {
+					color: $text;
+					font-weight: 700;
+				}
+			}
+
+			.additional-info {
+				margin-top: 12px;
+				padding: 12px;
+				border-radius: 12px;
+				background: rgba($bg-surface, 0.65);
+				border: 1px solid color.adjust($panel-border, $lightness: 12%);
+				box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+
+				.info-title {
+					margin-bottom: 6px;
+					font-size: 0.9rem;
+					font-weight: 700;
+					color: $text-muted;
+					letter-spacing: 0.01em;
+				}
+
+				ul {
+					margin: 0;
+					padding: 0;
+					list-style: none;
+					display: flex;
+					flex-direction: column;
+					gap: 8px;
+				}
+
+				li {
+					display: flex;
+					align-items: flex-start;
+					gap: 8px;
+					color: $text;
+					font-size: 0.9rem;
+					line-height: 1.35;
+				}
+
+				.dot {
+					width: 8px;
+					height: 8px;
+					margin-top: 6px;
+					border-radius: 50%;
+					background: linear-gradient(135deg, $accent-blue, $accent-cyan);
+					box-shadow: 0 0 0 6px rgba($accent-blue, 0.08);
+					flex-shrink: 0;
+				}
+
+				.info-text {
+					flex: 1;
+				}
+			}
+		}
+
+		.progress-bar {
+			width: 100%;
+			height: 8px;
+			background-color: $panel-border;
+			border-radius: 4px;
+			overflow: hidden;
+
+			.progress-fill {
+				height: 100%;
+				background: linear-gradient(90deg, $accent-blue 0%, $accent-green 100%);
+				transition: width 0.3s ease;
+			}
+		}
 	}
 
 	@keyframes spin {
@@ -320,106 +571,24 @@
 		}
 	}
 
-	.empty-icon,
-	.error-icon {
-		font-size: 3rem;
-		margin-bottom: 16px;
-	}
+	@media (max-width: 768px) {
+		.server-info-container {
+			padding: 10px 14px 28px;
 
-	.error-state {
-		color: #e74c3c;
-	}
+			.header {
+				flex-direction: column;
+				align-items: stretch;
 
-	.error-state p {
-		margin-bottom: 16px;
-	}
+				.header-left,
+				.header-right {
+					width: 100%;
+					justify-content: space-between;
+				}
+			}
 
-	.loading-state p,
-	.empty-state p,
-	.error-state p {
-		margin: 0;
-		font-size: 1rem;
-	}
-
-	/* Zones 그리드 */
-	.zones-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-		gap: 16px;
-	}
-
-	.zone-card {
-		padding: 16px;
-		background-color: #1a1a2e;
-		border-radius: 8px;
-		border: 1px solid #0f3460;
-		transition: border-color 0.2s;
-	}
-
-	.zone-card:hover {
-		border-color: #3498db;
-	}
-
-	.zone-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 12px;
-	}
-
-	.zone-name {
-		margin: 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #3498db;
-	}
-
-	.zone-status {
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 0.75rem;
-		font-weight: 500;
-		background-color: #7f8c8d;
-		color: white;
-		text-transform: uppercase;
-	}
-
-	.zone-status.active {
-		background-color: #2ecc71;
-	}
-
-	.zone-stats {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.stat-item {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.875rem;
-	}
-
-	.stat-label {
-		color: #7f8c8d;
-	}
-
-	.stat-value {
-		color: #ecf0f1;
-		font-weight: 600;
-	}
-
-	.progress-bar {
-		width: 100%;
-		height: 8px;
-		background-color: #0f3460;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.progress-fill {
-		height: 100%;
-		background: linear-gradient(90deg, #3498db 0%, #2ecc71 100%);
-		transition: width 0.3s ease;
+			.section {
+				padding: 16px;
+			}
+		}
 	}
 </style>
