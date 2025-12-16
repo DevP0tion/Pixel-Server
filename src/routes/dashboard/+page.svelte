@@ -2,13 +2,16 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { socketManager, type UnityServerInfo } from '$lib/socket';
+	import { _getUnityServers } from './get.remote';
+
+	const { data } = $props();
+	let unityServers = $derived(data.unityServers);
 
 	// Unity 서버 기본 별칭
 	const DEFAULT_UNITY_ALIAS = 'Game Server';
 
 	// 상태
 	let isConnected = $state(false);
-	let unityServers: UnityServerInfo[] = $state([]);
 
 	// 별칭 편집 상태
 	let editingServerId: string | null = $state(null);
@@ -27,53 +30,6 @@
 
 		addEventHandler('connect', () => {
 			isConnected = true;
-			// Unity 서버 목록 요청
-			socketManager.sendSocketEvent('unity:list');
-		});
-
-		addEventHandler('disconnect', () => {
-			isConnected = false;
-			unityServers = [];
-		});
-
-		// 환영 메시지에서 Unity 서버 목록 받기
-		addEventHandler('welcome', (data: unknown) => {
-			const welcomeData = data as { unityServers?: UnityServerInfo[] };
-			if (welcomeData.unityServers) {
-				unityServers = welcomeData.unityServers;
-			}
-		});
-
-		// Unity 서버 목록 응답
-		addEventHandler('unity:list', (data: unknown) => {
-			const listData = data as { unityServers?: UnityServerInfo[] };
-			if (listData.unityServers) {
-				unityServers = listData.unityServers;
-			}
-		});
-
-		// Unity 서버 연결 알림
-		addEventHandler('unity:connected', (data: unknown) => {
-			const connData = data as { unityServers?: UnityServerInfo[] };
-			if (connData.unityServers) {
-				unityServers = connData.unityServers;
-			}
-		});
-
-		// Unity 서버 연결 해제 알림
-		addEventHandler('unity:disconnected', (data: unknown) => {
-			const discData = data as { unityServers?: UnityServerInfo[] };
-			if (discData.unityServers) {
-				unityServers = discData.unityServers;
-			}
-		});
-
-		// Unity 서버 별칭 변경 알림
-		addEventHandler('unity:alias-changed', (data: unknown) => {
-			const aliasData = data as { unityServers?: UnityServerInfo[] };
-			if (aliasData.unityServers) {
-				unityServers = aliasData.unityServers;
-			}
 		});
 
 		// Unity 서버 강제 연결 해제 응답
@@ -97,18 +53,17 @@
 				console.error(res.message);
 			}
 		});
-
 	}
 
 	// 소켓 재연결
-	function reconnectSocket() {
-		socketManager.reconnect();
+	async function refreshDashboard() {
+		unityServers = await _getUnityServers(undefined);
 	}
 
 	// Unity 서버 강제 연결 해제
 	function disconnectUnityServer(unitySocketId: string) {
 		if (isConnected) {
-			socketManager.sendSocketEvent('unity:disconnect', { unitySocketId });
+			socketManager.sendUnityEvent('unity:disconnect', { unitySocketId });
 		}
 	}
 
@@ -127,7 +82,7 @@
 	// 별칭 저장
 	function saveAlias(unitySocketId: string) {
 		if (isConnected) {
-			socketManager.sendSocketEvent('unity:set-alias', {
+			socketManager.sendUnityEvent('unity:set-alias', {
 				unitySocketId,
 				alias: editingAlias.trim() || DEFAULT_UNITY_ALIAS
 			});
@@ -186,7 +141,6 @@
 	onMount(() => {
 		// 현재 연결 상태 동기화
 		isConnected = socketManager.isConnected;
-		unityServers = socketManager.unityServers;
 
 		// 이벤트 핸들러 등록
 		setupSocketEventHandlers();
@@ -194,9 +148,6 @@
 		// 아직 연결되지 않은 경우 연결 시도
 		if (!isConnected) {
 			socketManager.connect();
-		} else {
-			// 이미 연결되어 있으면 Unity 서버 목록 요청
-			socketManager.sendSocketEvent('unity:list');
 		}
 	});
 
@@ -222,7 +173,7 @@
 			</div>
 		</div>
 		<div class="header-right">
-			<button class="btn btn-primary" onclick={reconnectSocket}>새로고침</button>
+			<button class="btn btn-primary" onclick={refreshDashboard}>새로고침</button>
 		</div>
 	</header>
 
