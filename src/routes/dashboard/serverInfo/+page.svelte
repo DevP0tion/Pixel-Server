@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { socketManager, type ZoneInfo } from '$lib/socket';
+	import { type ZoneInfo } from '$lib/socket';
 	import { _getServerZones } from './get.remote';
 
 	const { data } = $props();
@@ -82,8 +82,15 @@
 			</div>
 		</div>
 		<div class="header-right">
-			<button class="btn btn-primary" onclick={requestZones} disabled={!serverId || isLoading}>
-				새로고침
+			<button
+				class="btn btn-primary refresh-btn"
+				class:is-loading={isLoading}
+				onclick={requestZones}
+				disabled={!serverId || isLoading}
+				aria-busy={isLoading}
+			>
+				<span class="refresh-icon" aria-hidden="true">⟳</span>
+				<span class="refresh-label">새로고침</span>
 			</button>
 		</div>
 	</header>
@@ -115,12 +122,12 @@
 				</div>
 			{:else}
 				<div class="zones-grid">
-					{#each zones as zone (zone.name)}
+					{#each zones as zone (zone.id)}
 						<div class="zone-card">
 							<div class="zone-header">
-								<h3 class="zone-name">{zone.name}</h3>
-								<span class="zone-status" class:active={zone.isActive}
-									>{zone.isActive ? 'Active' : 'Inactive'}</span
+								<h3 class="zone-name">Zone - {zone.id}</h3>
+								<span class="zone-status" class:active={zone.playerCount > 0}
+									>{zone.playerCount > 0 ? 'Active' : 'Inactive'}</span
 								>
 							</div>
 							<div class="zone-stats">
@@ -226,8 +233,7 @@
 		padding: 12px 20px 32px;
 		background:
 			radial-gradient(circle at 20% 20%, rgba($accent-blue, 0.08), transparent 35%),
-			radial-gradient(circle at 80% 10%, rgba($accent-cyan, 0.08), transparent 30%),
-			$bg-main;
+			radial-gradient(circle at 80% 10%, rgba($accent-cyan, 0.08), transparent 30%), $bg-main;
 
 		.header {
 			@extend %card;
@@ -327,6 +333,11 @@
 				text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
 
 				&:hover:not(:disabled) {
+					background: linear-gradient(
+						135deg,
+						color.adjust($accent-blue, $lightness: 6%),
+						color.adjust($accent-cyan, $lightness: 6%)
+					);
 					box-shadow: 0 12px 40px rgba($accent-blue, 0.35);
 				}
 			}
@@ -339,6 +350,27 @@
 				&:hover:not(:disabled) {
 					border-color: color.adjust($accent-orange, $lightness: 4%);
 				}
+			}
+		}
+
+		.refresh-btn {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+
+			.refresh-icon {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 1em;
+				height: 1em;
+				font-size: 1em;
+				line-height: 1;
+				transform-origin: 50% 50%;
+			}
+
+			&.is-loading .refresh-icon {
+				animation: spin 0.8s linear infinite;
 			}
 		}
 
@@ -544,20 +576,6 @@
 				.info-text {
 					flex: 1;
 				}
-			}
-		}
-
-		.progress-bar {
-			width: 100%;
-			height: 8px;
-			background-color: $panel-border;
-			border-radius: 4px;
-			overflow: hidden;
-
-			.progress-fill {
-				height: 100%;
-				background: linear-gradient(90deg, $accent-blue 0%, $accent-green 100%);
-				transition: width 0.3s ease;
 			}
 		}
 	}

@@ -15,9 +15,6 @@ export type UnityServerInfo = {
 // Zone 정보 타입
 export type ZoneInfo = {
 	id: number;
-	name: string;
-	position: { x: number; y: number; z: number };
-	isActive: boolean;
 	playerCount: number;
 	additionalInfo: string[];
 };
