@@ -269,7 +269,7 @@
 	</main>
 </div>
 
-<style>
+<style lang="scss">
 	:global(body) {
 		margin: 0;
 		padding: 0;
@@ -292,24 +292,24 @@
 		padding: 16px 24px;
 		background-color: #16213e;
 		border-bottom: 1px solid #0f3460;
-	}
 
-	.header-left {
-		display: flex;
-		align-items: center;
-		gap: 16px;
-	}
+		&-left {
+			display: flex;
+			align-items: center;
+			gap: 16px;
+		}
 
-	.header h1 {
-		margin: 0;
-		font-size: 1.5rem;
-		font-weight: bold;
-	}
+		&-right {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+		}
 
-	.header-right {
-		display: flex;
-		align-items: center;
-		gap: 12px;
+		h1 {
+			margin: 0;
+			font-size: 1.5rem;
+			font-weight: bold;
+		}
 	}
 
 	.connection-status {
@@ -323,10 +323,10 @@
 		height: 10px;
 		border-radius: 50%;
 		background-color: #e74c3c;
-	}
 
-	.status-indicator.connected {
-		background-color: #2ecc71;
+		&.connected {
+			background-color: #2ecc71;
+		}
 	}
 
 	.status-text {
@@ -345,59 +345,68 @@
 		transition:
 			background-color 0.2s,
 			transform 0.1s;
-	}
 
-	.btn:hover {
-		transform: translateY(-1px);
-	}
+		&:hover {
+			transform: translateY(-1px);
+		}
 
-	.btn:active {
-		transform: translateY(0);
+		&:active {
+			transform: translateY(0);
+		}
 	}
 
 	.btn-primary {
 		background-color: #3498db;
 		color: white;
-	}
 
-	.btn-primary:hover {
-		background-color: #2980b9;
+		&:hover {
+			background-color: #2980b9;
+		}
 	}
 
 	.btn-danger {
 		background-color: #e74c3c;
 		color: white;
-	}
 
-	.btn-danger:hover {
-		background-color: #c0392b;
+		&:hover {
+			background-color: #c0392b;
+		}
 	}
 
 	.btn-success {
 		background-color: #27ae60;
 		color: white;
-	}
 
-	.btn-success:hover {
-		background-color: #219a52;
+		&:hover {
+			background-color: #219a52;
+		}
 	}
 
 	.btn-secondary {
 		background-color: #7f8c8d;
 		color: white;
-	}
 
-	.btn-secondary:hover {
-		background-color: #6c7a7d;
+		&:hover {
+			background-color: #6c7a7d;
+		}
 	}
 
 	.btn-edit {
 		background-color: #9b59b6;
 		color: white;
+
+		&:hover {
+			background-color: #8e44ad;
+		}
 	}
 
-	.btn-edit:hover {
-		background-color: #8e44ad;
+	.btn-info {
+		background-color: #16a085;
+		color: white;
+
+		&:hover {
+			background-color: #138d75;
+		}
 	}
 
 	.btn-small {
@@ -424,12 +433,12 @@
 		justify-content: space-between;
 		align-items: center;
 		margin-bottom: 20px;
-	}
 
-	.section-header h2 {
-		margin: 0;
-		font-size: 1.25rem;
-		font-weight: 600;
+		h2 {
+			margin: 0;
+			font-size: 1.25rem;
+			font-weight: 600;
+		}
 	}
 
 	.server-count {
@@ -455,9 +464,11 @@
 		margin-bottom: 16px;
 	}
 
-	.empty-state p {
-		margin: 0;
-		font-size: 1rem;
+	.empty-state {
+		p {
+			margin: 0;
+			font-size: 1rem;
+		}
 	}
 
 	/* 서버 목록 */
@@ -477,10 +488,10 @@
 		border-radius: 8px;
 		border: 1px solid #0f3460;
 		transition: border-color 0.2s;
-	}
 
-	.server-card:hover {
-		border-color: #3498db;
+		&:hover {
+			border-color: #3498db;
+		}
 	}
 
 	.server-info {
@@ -512,16 +523,16 @@
 		font-weight: 600;
 		outline: none;
 		width: 200px;
-	}
 
-	.alias-input:focus {
-		border-color: #f39c12;
-		box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.2);
-	}
+		&:focus {
+			border-color: #f39c12;
+			box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.2);
+		}
 
-	.alias-input::placeholder {
-		color: #7f8c8d;
-		font-weight: 400;
+		&::placeholder {
+			color: #7f8c8d;
+			font-weight: 400;
+		}
 	}
 
 	.server-id {
@@ -565,14 +576,5 @@
 	.server-actions {
 		display: flex;
 		gap: 8px;
-	}
-
-	.btn-info {
-		background-color: #16a085;
-		color: white;
-	}
-
-	.btn-info:hover {
-		background-color: #138d75;
 	}
 </style>
