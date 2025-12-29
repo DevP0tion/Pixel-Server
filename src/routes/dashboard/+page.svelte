@@ -60,10 +60,10 @@
 		unityServers = await _getUnityServers(undefined);
 	}
 
-	// Unity 서버 강제 연결 해제
-	function disconnectUnityServer(unitySocketId: string) {
+	// Unity 서버 강제 중지
+	function stopUnityServer(unitySocketId: string) {
 		if (isConnected) {
-			socketManager.sendUnityEvent('unity:disconnect', { unitySocketId });
+			socketManager.sendUnityEvent('server:stop', { unitySocketId });
 		}
 	}
 
@@ -255,10 +255,10 @@
 								</button>
 								<button
 									class="btn btn-danger"
-									onclick={() => disconnectUnityServer(server.id)}
-									title="Unity 서버 강제 연결 해제"
+									onclick={() => stopUnityServer(server.id)}
+									title="Unity 서버 강제 중지"
 								>
-									연결 해제
+									서버 중지
 								</button>
 							</div>
 						</div>
