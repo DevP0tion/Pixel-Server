@@ -1,28 +1,40 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import type { Server } from 'node:http';
+
+const DEV_PORT = 5173;
+const PROD_PORT = '3000';
 
 let mainWindow: BrowserWindow | null = null;
-let serverProcess: ReturnType<typeof spawn> | null = null;
+// let serverModule: { server?: { server?: Server } } | null = null;
+let server: Server | null = null;
 
-function startServer() {
+async function startServer() {
 	const isDev = process.env.NODE_ENV === 'development';
 
 	if (!isDev) {
-		// 프로덕션에서 SvelteKit 서버 시작
 		const serverPath = path.join(__dirname, '../build/index.js');
-		serverProcess = spawn('node', [serverPath], {
-			env: { ...process.env, PORT: '3000' }
-		});
+		if (!process.env.PORT) {
+			process.env.PORT = PROD_PORT;
+		}
 
-		serverProcess.stdout?.on('data', (data) => {
-			console.log(`Server: ${data}`);
-		});
+		try {
+			const module = await import(pathToFileURL(serverPath).href);
 
-		serverProcess.stderr?.on('data', (data) => {
-			console.error(`Server Error: ${data}`);
-		});
+			server = module.server.server;
+		} catch (error) {
+			console.error('Failed to start server:', error);
+		}
 	}
+}
+
+function stopServer() {
+	const httpServer = server;
+	if (httpServer) {
+		httpServer.close();
+	}
+	server = null;
 }
 
 function createWindow() {
@@ -38,12 +50,12 @@ function createWindow() {
 
 	// 개발 환경에서는 Vite dev 서버로 연결
 	if (process.env.NODE_ENV === 'development') {
-		mainWindow.loadURL('http://localhost:5173');
+		mainWindow.loadURL(`http://localhost:${DEV_PORT}`);
 		mainWindow.webContents.openDevTools();
 	} else {
 		// 프로덕션에서는 로컬 서버로 연결
 		setTimeout(() => {
-			mainWindow?.loadURL('http://localhost:3000');
+			mainWindow?.loadURL(`http://localhost:${PROD_PORT}`);
 		}, 10000); // 서버 시작 대기
 	}
 
@@ -52,8 +64,8 @@ function createWindow() {
 	});
 }
 
-app.whenReady().then(() => {
-	startServer();
+app.whenReady().then(async () => {
+	await startServer();
 	createWindow();
 
 	app.on('activate', () => {
@@ -64,16 +76,18 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-	if (serverProcess) {
-		serverProcess.kill();
-	}
+	stopServer();
 	if (process.platform !== 'darwin') {
 		app.quit();
 	}
 });
 
 app.on('quit', () => {
-	if (serverProcess) {
-		serverProcess.kill();
+	stopServer();
+});
+
+app.on('quit', () => {
+	if (server) {
+		server.close();
 	}
 });

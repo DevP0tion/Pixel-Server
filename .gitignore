@@ -25,3 +25,4 @@ key/*
 # Electron
 /build-electron
 /dist
+electron/main.cjs
