@@ -1,6 +1,8 @@
 import { startSocketServer } from '$lib/server/socketIO.js';
 import { initializeFirebase } from '$lib/server/firebase.js';
 import { initializeDatabase } from '$lib/server/database/mysql';
+import { building } from '$app/environment';
+import { PUBLIC_SOCKET_PORT } from '$env/static/public';
 
 // MySQL 데이터베이스 초기화
 export const dbPool = initializeDatabase();
@@ -9,4 +11,4 @@ export const dbPool = initializeDatabase();
 export const { app: firebaseApp, auth: firebaseAuth } = initializeFirebase();
 
 // Socket.IO 서버 시작
-export const server = startSocketServer(7777);
+export const server = building ? null : startSocketServer(Number(PUBLIC_SOCKET_PORT));

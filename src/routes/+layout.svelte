@@ -1,7 +1,7 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
-	import { page } from '$app/stores';
-	import { resolveRoute } from '$app/paths';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
@@ -10,9 +10,9 @@
 
 	// Navigation items - resolve routes in advance
 	const navItems = [
-		{ path: '/', href: resolveRoute('/'), label: 'Home', icon: '🏠' },
-		{ path: '/console', href: resolveRoute('/console'), label: 'Console', icon: '💻' },
-		{ path: '/dashboard', href: resolveRoute('/dashboard'), label: 'Dashboard', icon: '📊' }
+		{ path: '/', href: resolve('/'), label: 'Home', icon: '🏠' },
+		{ path: '/console', href: resolve('/console'), label: 'Console', icon: '💻' },
+		{ path: '/dashboard', href: resolve('/dashboard'), label: 'Dashboard', icon: '📊' }
 	];
 
 	function toggleDrawer() {
@@ -47,7 +47,7 @@
 				<a
 					href={item.href}
 					class="nav-item"
-					class:active={$page.url.pathname === item.path}
+					class:active={page.url.pathname === item.path}
 					title={item.label}
 				>
 					<span class="nav-icon">{item.icon}</span>

@@ -1,0 +1,25 @@
+{
+	"appId": "com.pixelserver.app",
+	"productName": "Pixel Server",
+	"directories": {
+		"output": "dist"
+	},
+	"files": [
+		"build/**/*",
+		"build-electron/**/*",
+		"package.json",
+		"node_modules/**/*"
+	],
+	"asarUnpack": [
+		"build/**/*"
+	],
+	"win": {
+		"target": ["nsis"]
+	},
+	"mac": {
+		"target": ["dmg"]
+	},
+	"linux": {
+		"target": ["AppImage"]
+	}
+}

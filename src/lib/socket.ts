@@ -1,3 +1,5 @@
+import { PUBLIC_SOCKET_PORT } from '$env/static/public';
+
 /**
  * 공유 소켓 관리자
  * 페이지 간 이동 시에도 소켓 연결이 유지되도록 싱글톤 패턴으로 구현
@@ -72,7 +74,7 @@ class SocketManager extends EventEmitter {
 		}
 
 		// 새 소켓 연결
-		this.socket = io('http://localhost:7777', {
+		this.socket = io(`http://localhost:${PUBLIC_SOCKET_PORT}`, {
 			transports: ['websocket', 'polling'],
 			query: {
 				clientType: 'web'
