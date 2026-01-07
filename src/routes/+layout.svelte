@@ -12,7 +12,8 @@
 	const navItems = [
 		{ path: '/', href: resolve('/'), label: 'Home', icon: '🏠' },
 		{ path: '/console', href: resolve('/console'), label: 'Console', icon: '💻' },
-		{ path: '/dashboard', href: resolve('/dashboard'), label: 'Dashboard', icon: '📊' }
+		{ path: '/dashboard', href: resolve('/dashboard'), label: 'Dashboard', icon: '📊' },
+		{ path: '/test', href: resolve('/test'), label: 'Test', icon: '🧪' }
 	];
 
 	function toggleDrawer() {
@@ -42,7 +43,6 @@
 			</button>
 		</div>
 		<nav class="drawer-nav">
-			<!-- eslint-disable svelte/no-navigation-without-resolve -->
 			{#each navItems as item (item.path)}
 				<a
 					href={item.href}
@@ -56,7 +56,6 @@
 					{/if}
 				</a>
 			{/each}
-			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		</nav>
 	</aside>
 
