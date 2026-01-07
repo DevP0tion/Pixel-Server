@@ -6,15 +6,15 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "vite build && bun run build:electron && electron-builder",
+		"build:electron": "tsc -p tsconfig.electron.json",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"electron:dev": "cross-env NODE_ENV=development electron/main.js",
-		"electron:build": "bun run build && electron-builder"
+		"electron:dev": "cross-env NODE_ENV=development electron/main.js"
 	},
 	"devDependencies": {
 		"@eslint/compat": "2.0.0",
@@ -47,5 +47,5 @@
 		"typescript-eslint": "8.47.0",
 		"vite": "7.2.2"
 	},
-	"main": "build-electron/main.js"
+	"main": "build/main.cjs"
 }

@@ -11,4 +11,5 @@ export const dbPool = initializeDatabase();
 export const { app: firebaseApp, auth: firebaseAuth } = initializeFirebase();
 
 // Socket.IO 서버 시작
+// 빌드 중에는 서버를 시작하지 않음
 export const server = building ? null : startSocketServer(Number(PUBLIC_SOCKET_PORT));

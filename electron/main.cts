@@ -1,12 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-let mainWindow = null;
-let serverProcess = null;
+let mainWindow: BrowserWindow | null = null;
+let serverProcess: ReturnType<typeof spawn> | null = null;
 
 function startServer() {
 	const isDev = process.env.NODE_ENV === 'development';
