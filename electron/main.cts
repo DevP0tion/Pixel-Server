@@ -19,6 +19,8 @@ async function startServer() {
 			process.env.PORT = PROD_PORT;
 		}
 
+		process.env.root = process.env.PORTABLE_EXECUTABLE_DIR;
+
 		try {
 			const module = await import(pathToFileURL(serverPath).href);
 

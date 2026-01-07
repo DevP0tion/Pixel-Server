@@ -173,6 +173,7 @@
 			</div>
 		</div>
 		<div class="header-right">
+			<button class="btn btn-success" type="button">서버 생성</button>
 			<button class="btn btn-primary" onclick={refreshDashboard}>새로고침</button>
 		</div>
 	</header>
