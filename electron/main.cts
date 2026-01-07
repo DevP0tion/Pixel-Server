@@ -30,7 +30,7 @@ function createWindow() {
 		width: 1200,
 		height: 800,
 		webPreferences: {
-			preload: path.join(__dirname, 'preload.js'),
+			preload: path.join(__dirname, 'preload.cjs'),
 			nodeIntegration: false,
 			contextIsolation: true
 		}
@@ -44,7 +44,7 @@ function createWindow() {
 		// 프로덕션에서는 로컬 서버로 연결
 		setTimeout(() => {
 			mainWindow?.loadURL('http://localhost:3000');
-		}, 2000); // 서버 시작 대기
+		}, 10000); // 서버 시작 대기
 	}
 
 	mainWindow.on('closed', () => {
