@@ -1,6 +1,6 @@
-import { constants } from 'node:fs';
-import { access } from 'node:fs/promises';
-import path from 'node:path';
+import { constants } from 'fs';
+import { access } from 'fs/promises';
+import path from 'path';
 
 async function fileExists(filePath: string): Promise<boolean> {
 	try {

@@ -7,12 +7,12 @@ import EventEmitter from 'eventemitter3';
 // 로그 타입 정의
 export type LogType = 'game' | 'socketio' | 'web';
 
-export interface LogEntry {
+export type LogEntry = {
 	id: number;
 	type: LogType;
 	message: string;
 	timestamp: Date;
-}
+};
 
 // 로그 저장소 클래스
 class LogStore extends EventEmitter {

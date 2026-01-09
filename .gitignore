@@ -26,3 +26,4 @@ key/*
 /build-electron
 /dist
 electron/main.cjs
+/TODO/*
