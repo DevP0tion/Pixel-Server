@@ -1,11 +1,8 @@
 import EventEmitter from 'eventemitter3';
 import fs from 'fs';
 import path from 'path';
-import electron from 'electron';
 
-const { BrowserWindow } = electron;
-
-export type LogType = 'unity' | 'svelte';
+export type LogType = 'unity' | 'svelte' | 'input';
 
 export type LogEntry = {
 	type: LogType;
@@ -106,9 +103,6 @@ export class Logger extends EventEmitter<LoggerEvents> {
 		}
 
 		this.emit('log', entry);
-		BrowserWindow.getAllWindows().forEach((win) => {
-			win.webContents.send('new-log', entry);
-		});
 	}
 
 	// 로그 지우기

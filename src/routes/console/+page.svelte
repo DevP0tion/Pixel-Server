@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { source } from 'sveltekit-sse';
+	import type { PageProps } from './$types';
 	import { handleSvelteCommand } from './console.client';
 	import { _log } from './console.remote';
-	import type { PageProps } from './$types';
-	import { onMount } from 'svelte';
 	import type { LogEntry, LogType } from '$lib/server/logger';
 
 	let { data }: PageProps = $props();
@@ -31,11 +32,11 @@
 	);
 
 	function sendCommand(input: string = commandInput) {
-		console.log('Sending command:', input, 'to', commandTarget);
-
 		if (commandTarget === 'svelte') {
 			handleSvelteCommand(input);
 		}
+
+		commandInput = '';
 	}
 
 	onMount(() => {
@@ -43,6 +44,21 @@
 		logs = data.logs;
 
 		console.log('Initial logs loaded:', $state.snapshot(logs));
+
+		const unsubscribe = source('/console')
+			.select('new-log')
+			.subscribe((logJson) => {
+				if (!logJson) return;
+				const log: {
+					type: LogType;
+					message: string;
+					timestamp: string;
+				} = JSON.parse(logJson);
+
+				logs = [...logs, { ...log, timestamp: new Date(log.timestamp) }];
+			});
+
+		return () => unsubscribe();
 	});
 </script>
 

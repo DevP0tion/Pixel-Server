@@ -42,6 +42,7 @@
 		"svelte-check": "4.3.4",
 		"svelte-preprocess": "6.0.3",
 		"sveltekit-i18n": "2.4.2",
+		"sveltekit-sse": "^0.14.3",
 		"tsx": "4.21.0",
 		"typescript": "5.9.3",
 		"typescript-eslint": "8.47.0",

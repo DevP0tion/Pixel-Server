@@ -31,12 +31,14 @@ function helpHandler() {
 		lines.push(`- ${cmd.command}: ${cmd.description}`);
 	});
 
-	_log(lines.join('\n'));
+	_log({ type: 'svelte', message: lines.join('\n') });
 }
 
 export async function handleSvelteCommand(input: string) {
+	_log({ type: 'input', message: input });
+
 	if (input.length === 0) {
-		_log('명령어가 입력되지 않았습니다.');
+		_log({ type: 'svelte', message: '명령어가 입력되지 않았습니다.' });
 		return;
 	}
 
@@ -45,7 +47,7 @@ export async function handleSvelteCommand(input: string) {
 	const cmd = svelteCommandSet.get(command);
 
 	if (!cmd) {
-		_log(`알 수 없는 명령어: ${command}`);
+		_log({ type: 'svelte', message: `알 수 없는 명령어: ${command}` });
 		return;
 	}
 
