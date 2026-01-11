@@ -64,7 +64,8 @@ export class Logger extends EventEmitter<LoggerEvents> {
 		// production 환경이 아니면 console.log 출력
 		if (process.env.NODE_ENV !== 'production') {
 			console.log(`[${entry.timestamp.toISOString()}] [${entry.type}] ${entry.message}`);
-
+			this.logs.push(entry);
+			this.emit('log', entry);
 			return;
 		}
 

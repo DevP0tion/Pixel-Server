@@ -20,55 +20,27 @@ class SvelteCommand {
 
 const svelteCommandSet = new Map<string, SvelteCommand>([
 	['help', new SvelteCommand('help', helpHandler, '도움말을 표시합니다.')],
-	[
-		'status',
-		new SvelteCommand(
-			'status',
-			async () => await _printStatus(undefined),
-			'서버 상태를 표시합니다.'
-		)
-	],
-	['ping', new SvelteCommand('ping', async () => await _ping(undefined), 'pong 응답을 반환합니다.')]
+	['status', new SvelteCommand('status', _printStatus, '서버 상태를 표시합니다.')],
+	['ping', new SvelteCommand('ping', _ping, 'pong 응답을 반환합니다.')]
 ]);
 
-function helpHandler(): CommandResponse {
+function helpHandler() {
 	const lines = ['사용 가능한 Svelte 서버 명령어:'];
 
 	svelteCommandSet.forEach((cmd) => {
 		lines.push(`- ${cmd.command}: ${cmd.description}`);
 	});
 
-	return {
-		code: 100,
-		message: lines.join('\n')
-	};
-}
-
-function parseArgsRecord(args: string[]) {
-	const record: Argument = {};
-	for (const part of args) {
-		if (!part) continue;
-		const [key, value] = part.split('=');
-		if (!key) continue;
-		if (value === undefined) {
-			record[key] = true;
-			continue;
-		}
-		const numeric = Number(value);
-		record[key] = Number.isNaN(numeric) ? value : numeric;
-	}
-	return record;
+	_log(lines.join('\n'));
 }
 
 export async function handleSvelteCommand(input: string) {
-	const trimmed = input.trim();
-
-	if (!trimmed) {
+	if (input.length === 0) {
 		_log('명령어가 입력되지 않았습니다.');
 		return;
 	}
 
-	const args = trimmed.split(/\s+/);
+	const args = input.split(' ');
 	const command = args[0];
 	const cmd = svelteCommandSet.get(command);
 

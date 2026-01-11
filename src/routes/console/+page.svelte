@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { handleSvelteCommand, type CommandResponse } from './console.client';
+	import { handleSvelteCommand } from './console.client';
 	import { _log } from './console.remote';
 	import type { PageProps } from './$types';
 	import { onMount } from 'svelte';
@@ -30,29 +30,19 @@
 		})
 	);
 
-	async function sendCommand() {
-		console.log('Sending command:', commandInput, 'to', commandTarget);
-		const trimmed = commandInput.trim();
-		commandInput = '';
+	function sendCommand(input: string = commandInput) {
+		console.log('Sending command:', input, 'to', commandTarget);
 
-		if (!trimmed) {
-			await handleSvelteCommand(trimmed);
-			return;
-		}
-	}
-
-	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			sendCommand();
+		if (commandTarget === 'svelte') {
+			handleSvelteCommand(input);
 		}
 	}
 
 	onMount(() => {
 		// 초기 로그 로드
+		logs = data.logs;
 
-		data.logs.forEach((log: LogEntry) => {
-			logs = [...logs, log];
-		});
+		console.log('Initial logs loaded:', $state.snapshot(logs));
 	});
 </script>
 
@@ -129,13 +119,15 @@
 			<input
 				type="text"
 				bind:value={commandInput}
-				onkeydown={handleKeydown}
+				onkeydown={(e) => {
+					if (e.key === 'Enter') sendCommand(commandInput);
+				}}
 				placeholder={commandTarget === 'svelte'
 					? 'Svelte 콘솔 명령어 입력... (help, clear, status 등)'
 					: 'Unity 서버 명령어 입력...'}
 				class="command-input"
 			/>
-			<button class="btn btn-success" onclick={sendCommand}>전송</button>
+			<button class="btn btn-success" onclick={() => sendCommand(commandInput)}>전송</button>
 		</div>
 	</div>
 </div>
