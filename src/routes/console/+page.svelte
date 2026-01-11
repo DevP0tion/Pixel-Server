@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { source } from 'sveltekit-sse';
 	import type { PageProps } from './$types';
 	import { handleSvelteCommand } from './console.client';
@@ -31,6 +31,12 @@
 		})
 	);
 
+	async function scrollLogToBottom() {
+		if (!logContainer) return;
+		await tick();
+		logContainer.scrollTop = logContainer.scrollHeight;
+	}
+
 	function sendCommand(input: string = commandInput) {
 		if (commandTarget === 'svelte') {
 			handleSvelteCommand(input);
@@ -42,8 +48,7 @@
 	onMount(() => {
 		// 초기 로그 로드
 		logs = data.logs;
-
-		console.log('Initial logs loaded:', $state.snapshot(logs));
+		void scrollLogToBottom();
 
 		const unsubscribe = source('/console')
 			.select('new-log')
@@ -56,6 +61,9 @@
 				} = JSON.parse(logJson);
 
 				logs = [...logs, { ...log, timestamp: new Date(log.timestamp) }];
+				if (autoScroll) {
+					void scrollLogToBottom();
+				}
 			});
 
 		return () => unsubscribe();
@@ -214,7 +222,8 @@
 	.console-container {
 		display: flex;
 		flex-direction: column;
-		min-height: 100vh;
+		height: 100vh;
+		overflow: hidden;
 		background-color: $bg-main;
 		color: $text;
 
@@ -374,11 +383,13 @@
 
 		.log-container {
 			flex: 1;
+			min-height: 0;
 			overflow-y: auto;
 			padding: 16px;
 			background-color: $bg-main;
 			font-family: $font-code;
 			font-size: 0.875rem;
+			tab-size: 2;
 
 			.log-entry {
 				display: flex;
