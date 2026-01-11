@@ -1,4 +1,4 @@
-import { logStore, type LogType } from '$lib/logStore';
+import { logStore, type LogType } from '$lib/client/logStore';
 import { socketManager } from '$lib/socket';
 
 /**

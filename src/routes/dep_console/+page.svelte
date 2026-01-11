@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { socketManager } from '$lib/socket';
-	import { logStore, type LogEntry } from '$lib/logStore';
+	import { logStore, type LogEntry } from '$lib/client/logStore';
 	import {
 		addLog,
 		getLogPrefix,
