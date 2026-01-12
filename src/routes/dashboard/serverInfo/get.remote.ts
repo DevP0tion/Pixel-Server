@@ -1,7 +1,12 @@
 import { command } from '$app/server';
 import { error as kitError } from '@sveltejs/kit';
-import type { ZoneInfo } from '$lib/socket';
 import { server } from 'src/hooks.server';
+
+type ZoneInfo = {
+	id: number;
+	playerCount: number;
+	additionalInfo: string[];
+};
 
 export const _getServerZones = command('unchecked', async ({ serverId }: { serverId?: string }) => {
 	if (!serverId) {

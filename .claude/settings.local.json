@@ -4,7 +4,10 @@
       "Bash(npm install:*)",
       "Bash(npm pkg set:*)",
       "Bash(cat:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(bun run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(bun install)"
     ]
   }
 }

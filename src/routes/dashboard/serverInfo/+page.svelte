@@ -2,8 +2,13 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { type ZoneInfo } from '$lib/socket';
 	import { _getServerZones } from './get.remote';
+
+	type ZoneInfo = {
+		id: number;
+		playerCount: number;
+		additionalInfo: string[];
+	};
 
 	const { data } = $props();
 

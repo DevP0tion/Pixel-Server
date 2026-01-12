@@ -30,8 +30,11 @@ export class Logger extends EventEmitter<LoggerEvents> {
 		if (process.env.NODE_ENV !== 'production') {
 			this.savePath = '';
 		} else {
-			this.savePath = path.resolve(process.env.root as string, savePath);
-			fs.mkdirSync(this.savePath, { recursive: true });
+			const rootPath = process.env.root || process.cwd();
+			this.savePath = path.resolve(rootPath, savePath);
+			if (this.savePath) {
+				fs.mkdirSync(this.savePath, { recursive: true });
+			}
 		}
 
 		this.maxLogLength = maxLogLength;

@@ -1,4 +1,4 @@
-import { startSocketServer } from '$lib/server/socketIO.js';
+import { startSocketServer, server as socketIOServer } from '$lib/server/socketIO.js';
 import { initializeFirebase } from '$lib/server/firebase.js';
 import { initializeDatabase } from '$lib/server/database/mysql';
 import { building } from '$app/environment';
@@ -12,6 +12,9 @@ export const { app: firebaseApp, auth: firebaseAuth } = initializeFirebase();
 
 // Socket.IO 서버 시작
 // 빌드 중에는 서버를 시작하지 않음
-export const server: ReturnType<typeof startSocketServer> = building
-	? (null as unknown as ReturnType<typeof startSocketServer>)
-	: startSocketServer(Number(PUBLIC_SOCKET_PORT));
+if (!building) {
+	startSocketServer(Number(PUBLIC_SOCKET_PORT));
+}
+
+// Socket.IO server 객체 re-export (Command API에서 사용)
+export { socketIOServer as server };

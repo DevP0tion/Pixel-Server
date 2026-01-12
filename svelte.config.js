@@ -19,6 +19,9 @@ const config = {
 		experimental: {
 			remoteFunctions: true
 		},
+		prerender: {
+			handleHttpError: 'warn'
+		}
 	},
 	compilerOptions: {
 		experimental: {

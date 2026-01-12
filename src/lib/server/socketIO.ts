@@ -31,6 +31,14 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 	? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
 	: '*';
 
+// Server 객체 export (Command API에서 접근하기 위해)
+export let server: {
+	unityServers: Map<string, Socket>;
+	webClients: Map<string, Socket>;
+	unityServerAliases: Map<string, string>;
+	connectedClients: Map<string, ConnectedClient>;
+} | null = null;
+
 /**
  * 현재 연결된 Unity 서버 목록 가져오기
  */
@@ -56,22 +64,6 @@ function getUnityServerList(
 	return list;
 }
 
-/**
- * Unity 서버에서 웹 콘솔로 응답을 전달하는 함수
- */
-function relayResponseToWeb(
-	event: string,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	data: any,
-	connectedClients: Map<string, ConnectedClient>
-) {
-	// 모든 웹 콘솔 클라이언트에게 응답 전달
-	connectedClients.forEach((client) => {
-		if (client.clientType === 'web' && client.socket.connected) {
-			client.socket.emit(event, data);
-		}
-	});
-}
 
 /**
  * Socket.IO 서버 시작
@@ -88,6 +80,14 @@ export function startSocketServer(port: number = 7777) {
 
 	// Unity 서버 별칭 저장소
 	const unityServerAliases: Map<string, string> = new Map();
+
+	// server 객체 할당 (Command API에서 접근 가능하도록)
+	server = {
+		unityServers,
+		webClients,
+		unityServerAliases,
+		connectedClients
+	};
 
 	// Socket.IO 서버 인스턴스
 	const io = new Server({
@@ -199,59 +199,7 @@ export function startSocketServer(port: number = 7777) {
 			// 기본 별칭 설정
 			unityServerAliases.set(socket.id, DEFAULT_UNITY_ALIAS);
 
-			// 모든 웹 콘솔에 Unity 서버 연결 알림
-			relayResponseToWeb(
-				'unity:connected',
-				{
-					message: 'Unity 서버가 연결되었습니다.',
-					unitySocketId: socket.id,
-					unityServers: getUnityServerList(
-						unityServers,
-						connectedClients,
-						unityServerAliases,
-						DEFAULT_UNITY_ALIAS
-					)
-				},
-				connectedClients
-			);
-
-			// Unity 서버에서 오는 이벤트들을 웹 콘솔로 전달
-			socket.on('unity:response', (data: string) => {
-				console.log(`[Relay] Unity → 웹: command:response`);
-				relayResponseToWeb('game:response', data, connectedClients);
-			});
-
-			socket.on('player:leave', (data) => {
-				console.log(`[Relay] Unity → 웹: player:leave`);
-				relayResponseToWeb('player:leave', data, connectedClients);
-			});
-
-			socket.on('game:log', (data) => {
-				console.log(`[Relay] Unity → 웹: game:log`);
-				relayResponseToWeb('game:log', data, connectedClients);
-			});
-
-			socket.on('game:event', (data) => {
-				console.log(`[Relay] Unity → 웹: game:event`);
-				relayResponseToWeb('game:event', data, connectedClients);
-			});
-
-			socket.on('server_status', (data) => {
-				console.log(`[Relay] Unity → 웹: server_status`);
-				relayResponseToWeb('server_status', data, connectedClients);
-			});
-
-			socket.on('zones:list', (data) => {
-				console.log(`[Relay] Unity → 웹: zones:list`);
-				relayResponseToWeb('zones:list', data, connectedClients);
-			});
-
 			console.log(`[Room] Unity 서버가 'game' 채널에 참여했습니다: ${socket.id}`);
-		} else {
-			socket.join(SocketRooms.WebClients);
-			webClients.set(socket.id, socket);
-
-			console.log(`[Room] 웹 콘솔이 'web' 채널에 참여했습니다: ${socket.id}`);
 		}
 
 		const handleUnityCommand = (commandSocket: Socket, data: CommandData) => {
@@ -264,29 +212,6 @@ export function startSocketServer(port: number = 7777) {
 			}
 
 			const client = connectedClients.get(commandSocket.id);
-
-			if (client?.clientType === 'web') {
-				if (data.target === 'unity') {
-					console.log(`[Command] unity:command 수신 (웹 → Unity): ${data.cmd}`);
-					// 웹 콘솔에서 온 명령어 → Unity 서버로 전달
-					unity(...data.targetServer).send(data.cmd, data.args);
-
-					return;
-				}
-
-				if (data.target === 'socketIO') {
-					console.log(`[Command] unity:command 수신 (웹 → SocketIO): ${data.cmd}`);
-					// SocketIO 서버에서 처리
-					commandHandler.handleCommand(commandSocket, data);
-					return;
-				}
-
-				commandSocket.emit('command:response', {
-					code: 400,
-					message: `지원하지 않는 명령 대상입니다: ${String(data.target)}`
-				});
-				return;
-			}
 
 			if (client?.clientType === 'unity') {
 				console.log(`[Command] unity:command 수신 (Unity): ${data.cmd}`);
@@ -353,21 +278,6 @@ export function startSocketServer(port: number = 7777) {
 				alias: newAlias
 			});
 
-			// 모든 웹 클라이언트에 별칭 변경 알림
-			relayResponseToWeb(
-				'unity:alias-changed',
-				{
-					unitySocketId: data.unitySocketId,
-					alias: newAlias,
-					unityServers: getUnityServerList(
-						unityServers,
-						connectedClients,
-						unityServerAliases,
-						DEFAULT_UNITY_ALIAS
-					)
-				},
-				connectedClients
-			);
 		});
 
 		// Unity 서버 강제 연결 해제 요청 핸들러
@@ -412,22 +322,6 @@ export function startSocketServer(port: number = 7777) {
 				unityServerAliases.delete(socket.id);
 				console.log(
 					`[Unity] Unity 서버 연결이 해제되었습니다. (남은 서버: ${unityServers.size}개)`
-				);
-
-				// 모든 웹 콘솔에 Unity 서버 연결 해제 알림
-				relayResponseToWeb(
-					'unity:disconnected',
-					{
-						message: 'Unity 서버 연결이 해제되었습니다.',
-						unitySocketId: socket.id,
-						unityServers: getUnityServerList(
-							unityServers,
-							connectedClients,
-							unityServerAliases,
-							DEFAULT_UNITY_ALIAS
-						)
-					},
-					connectedClients
 				);
 			}
 

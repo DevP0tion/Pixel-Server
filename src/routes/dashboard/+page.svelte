@@ -1,8 +1,14 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { socketManager, type UnityServerInfo } from '$lib/socket';
 	import { _getUnityServers } from './get.remote';
+	import { _stopUnityServer, _setUnityAlias } from './dashboard.remote';
+
+	type UnityServerInfo = {
+		id: string;
+		connectedAt: string;
+		alias: string;
+	};
 
 	const { data } = $props();
 	let unityServers = $derived(data.unityServers);
@@ -10,50 +16,9 @@
 	// Unity 서버 기본 별칭
 	const DEFAULT_UNITY_ALIAS = 'Game Server';
 
-	// 상태
-	let isConnected = $state(false);
-
 	// 별칭 편집 상태
 	let editingServerId: string | null = $state(null);
 	let editingAlias = $state('');
-
-	// 이벤트 리스너 정리를 위한 배열
-	let eventCleanupFns: Array<() => void> = [];
-
-	// 이벤트 핸들러 등록
-	function setupSocketEventHandlers() {
-		// 이벤트 리스너 헬퍼 함수
-		function addEventHandler(event: string, handler: (...args: unknown[]) => void) {
-			socketManager.on(event, handler);
-			eventCleanupFns.push(() => socketManager.off(event, handler));
-		}
-
-		addEventHandler('connect', () => {
-			isConnected = true;
-		});
-
-		// Unity 서버 강제 연결 해제 응답
-		addEventHandler('unity:disconnect:response', (response: unknown) => {
-			const res = response as { code: number; message: string };
-			if (res.code === 100) {
-				console.log(res.message);
-			} else {
-				console.error(res.message);
-			}
-		});
-
-		// Unity 서버 별칭 변경 응답
-		addEventHandler('unity:set-alias:response', (response: unknown) => {
-			const res = response as { code: number; message: string };
-			if (res.code === 100) {
-				console.log(res.message);
-				editingServerId = null;
-				editingAlias = '';
-			} else {
-				console.error(res.message);
-			}
-		});
-	}
 
 	// 소켓 재연결
 	async function refreshDashboard() {
@@ -61,9 +26,14 @@
 	}
 
 	// Unity 서버 강제 중지
-	function stopUnityServer(unitySocketId: string) {
-		if (isConnected) {
-			socketManager.sendUnityEvent('server:stop', { unitySocketId });
+	async function stopUnityServer(unitySocketId: string) {
+		const result = await _stopUnityServer({ unitySocketId });
+		if (result.success) {
+			console.log(result.message);
+			// 목록 새로고침
+			await refreshDashboard();
+		} else {
+			console.error(result.message);
 		}
 	}
 
@@ -80,12 +50,20 @@
 	}
 
 	// 별칭 저장
-	function saveAlias(unitySocketId: string) {
-		if (isConnected) {
-			socketManager.sendUnityEvent('unity:set-alias', {
-				unitySocketId,
-				alias: editingAlias.trim() || DEFAULT_UNITY_ALIAS
-			});
+	async function saveAlias(unitySocketId: string) {
+		const result = await _setUnityAlias({
+			unitySocketId,
+			alias: editingAlias.trim() || DEFAULT_UNITY_ALIAS
+		});
+
+		if (result.success) {
+			console.log(result.message);
+			editingServerId = null;
+			editingAlias = '';
+			// 목록 새로고침
+			await refreshDashboard();
+		} else {
+			console.error(result.message);
 		}
 	}
 
@@ -138,24 +116,7 @@
 		goto(`/dashboard/serverInfo?${params.toString()}`);
 	}
 
-	onMount(() => {
-		// 현재 연결 상태 동기화
-		isConnected = socketManager.isConnected;
-
-		// 이벤트 핸들러 등록
-		setupSocketEventHandlers();
-
-		// 아직 연결되지 않은 경우 연결 시도
-		if (!isConnected) {
-			socketManager.connect();
-		}
-	});
-
-	onDestroy(() => {
-		// 이벤트 리스너만 정리 (소켓 연결은 유지)
-		eventCleanupFns.forEach((cleanup) => cleanup());
-		eventCleanupFns = [];
-	});
+	// onMount는 필요 없음 - Command API는 자동으로 처리됨
 </script>
 
 <svelte:head>
@@ -167,10 +128,6 @@
 	<header class="header">
 		<div class="header-left">
 			<h1>Pixel Server Dashboard</h1>
-			<div class="connection-status">
-				<span class="status-indicator" class:connected={isConnected}></span>
-				<span class="status-text">{isConnected ? '서버 연결됨' : '서버 연결 끊김'}</span>
-			</div>
 		</div>
 		<div class="header-right">
 			<button class="btn btn-success" type="button">서버 생성</button>
@@ -313,27 +270,6 @@
 		}
 	}
 
-	.connection-status {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.status-indicator {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background-color: #e74c3c;
-
-		&.connected {
-			background-color: #2ecc71;
-		}
-	}
-
-	.status-text {
-		font-size: 0.875rem;
-		color: #a0a0a0;
-	}
 
 	/* 버튼 */
 	.btn {

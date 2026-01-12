@@ -1,6 +1,11 @@
 import { server } from 'src/hooks.server';
 import { _getServerZones } from './get.remote';
-import type { ZoneInfo } from '$lib/socket';
+
+type ZoneInfo = {
+	id: number;
+	playerCount: number;
+	additionalInfo: string[];
+};
 
 export async function load({ url }) {
 	const serverId = url.searchParams.get('serverId') || '';
