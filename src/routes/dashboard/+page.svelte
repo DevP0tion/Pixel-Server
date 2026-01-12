@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { _getUnityServers } from './get.remote';
-	import { _stopUnityServer, _setUnityAlias } from './dashboard.remote';
+	import { _getUnityServers, _stopUnityServer, _setUnityAlias } from './dashboard.remote';
 
 	type UnityServerInfo = {
 		id: string;
