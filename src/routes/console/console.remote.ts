@@ -1,8 +1,10 @@
 import { command } from '$app/server';
-import { server } from 'src/hooks.server';
+import { ServerManager } from '$lib/server/socketIO';
 import { logger, type LogType } from '$lib/server/logger';
 
 export const _printStatus = command('unchecked', async () => {
+	const server = ServerManager.getInstance();
+
 	if (!server) {
 		logger.log('svelte', '서버가 초기화되지 않았습니다.');
 	}

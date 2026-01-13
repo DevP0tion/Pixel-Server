@@ -1,5 +1,6 @@
-import { server } from 'src/hooks.server';
-import { _getServerZones } from './get.remote';
+import { ServerManager } from '$lib/server/socketIO';
+
+export const prerender = false;
 
 type ZoneInfo = {
 	id: number;
@@ -15,7 +16,7 @@ export async function load({ url }) {
 	}
 
 	try {
-		const responses = await server.unity(serverId).fetch('zones:list', {});
+		const responses = await ServerManager.getInstance().unity(serverId).fetch('zones:list', {});
 		const zones: ZoneInfo[] = JSON.parse(responses[0].data);
 
 		return { zones };

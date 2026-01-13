@@ -4,7 +4,8 @@ export type {
 	CommandResponse,
 	ClientType,
 	ConnectedClient,
-	CommandHandler
+	CommandHandler,
+	ServerSource
 } from './types.js';
 
 // Command Handler

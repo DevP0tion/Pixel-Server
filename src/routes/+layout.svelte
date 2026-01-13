@@ -10,8 +10,8 @@
 	const navItems = [
 		{ path: '/', href: resolve('/'), label: 'Home', icon: '🏠' },
 		{ path: '/console', href: resolve('/console'), label: 'Console', icon: '💻' },
-		{ path: '/dashboard', href: resolve('/dashboard'), label: 'Dashboard', icon: '📊' },
-		{ path: '/test', href: resolve('/test'), label: 'Test', icon: '🧪' }
+		{ path: '/dashboard', href: resolve('/dashboard'), label: 'Dashboard', icon: '📊' }
+		// { path: '/test', href: resolve('/test'), label: 'Test', icon: '🧪' }
 	];
 
 	function toggleDrawer() {

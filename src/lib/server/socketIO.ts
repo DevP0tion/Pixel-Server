@@ -1,6 +1,5 @@
 import { Server, type Socket } from 'socket.io';
 import {
-	type CommandTarget,
 	type ConnectedClient,
 	type ClientType,
 	SocketCommandHandler,
@@ -8,12 +7,14 @@ import {
 } from '$lib/server/index.js';
 import { loadCommands } from '$lib/server/commands.js';
 import type { CommandData } from './types';
+import type { Session } from 'frida';
 
 // Unity 서버 정보를 웹 클라이언트에게 전송하기 위한 인터페이스
 type UnityServerInfo = {
 	id: string;
 	connectedAt: string;
 	alias: string;
+	pid?: number;
 };
 
 export type UnityResponse = {
@@ -40,6 +41,8 @@ export class ServerManager {
 	public connectedClients: Map<string, ConnectedClient> = new Map();
 	public io: Server | null = null;
 	private readonly commandHandler = new SocketCommandHandler();
+	public fridaSessions: Map<string, Session> = new Map();
+	public fridaProcessIds: Map<string, number> = new Map();
 
 	private constructor() {
 		loadCommands(this.commandHandler, this.connectedClients);
@@ -65,6 +68,27 @@ export class ServerManager {
 					id,
 					connectedAt: client.connectedAt.toISOString(),
 					alias: this.unityServerAliases.get(id) || DEFAULT_UNITY_ALIAS
+				});
+			}
+		});
+
+		return list;
+	}
+
+	/**
+	 * Frida로 생성된 Unity 서버 목록 가져오기
+	 */
+	public getFridaServerList(): UnityServerInfo[] {
+		const list: UnityServerInfo[] = [];
+
+		this.unityServers.forEach((socket, id) => {
+			const client = this.connectedClients.get(id);
+			if (client && client.serverSource === 'frida') {
+				list.push({
+					id,
+					connectedAt: client.connectedAt.toISOString(),
+					alias: this.unityServerAliases.get(id) || DEFAULT_UNITY_ALIAS,
+					pid: this.fridaProcessIds.get(id)
 				});
 			}
 		});
@@ -168,6 +192,7 @@ export class ServerManager {
 		io.on('connection', (socket: Socket) => {
 			// 클라이언트 타입 확인 (handshake query에서)
 			const clientType: ClientType = (socket.handshake.query.clientType as ClientType) || 'web';
+			const fridaSessionId = socket.handshake.query.fridaSessionId as string | undefined;
 
 			console.log(
 				`[Connection] ${clientType === 'unity' ? 'Unity 서버' : '웹 콘솔'} 연결됨: ${socket.id}`
@@ -179,8 +204,25 @@ export class ServerManager {
 				id: socket.id,
 				clientType,
 				authenticated: false,
-				connectedAt: new Date()
+				connectedAt: new Date(),
+				serverSource: fridaSessionId ? 'frida' : 'direct'
 			});
+
+			// Frida로 생성된 경우, session을 socket ID로 재매핑
+			if (fridaSessionId && this.fridaSessions.has(fridaSessionId)) {
+				const session = this.fridaSessions.get(fridaSessionId)!;
+				const pid = this.fridaProcessIds.get(fridaSessionId)!;
+
+				this.fridaSessions.delete(fridaSessionId);
+				this.fridaProcessIds.delete(fridaSessionId);
+
+				this.fridaSessions.set(socket.id, session);
+				this.fridaProcessIds.set(socket.id, pid);
+
+				console.log(
+					`[Frida] Session ${fridaSessionId} remapped to socket ${socket.id}, PID: ${pid}`
+				);
+			}
 
 			// 클라이언트 타입에 따라 room에 join
 			if (clientType === 'unity') {

@@ -1,0 +1,5 @@
+(node:26676) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Firebase 프로젝트 초기화 완료: pixel-server-da7fb
+Starting game server on port 7777
+Listening on http://0.0.0.0:3000

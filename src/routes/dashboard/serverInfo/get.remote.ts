@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { error as kitError } from '@sveltejs/kit';
-import { server } from 'src/hooks.server';
+import { ServerManager } from '$lib/server/socketIO';
 
 type ZoneInfo = {
 	id: number;
@@ -14,7 +14,7 @@ export const _getServerZones = command('unchecked', async ({ serverId }: { serve
 	}
 
 	try {
-		const responses = await server.unity(serverId).fetch('zones:list', {});
+		const responses = await ServerManager.getInstance().unity(serverId).fetch('zones:list', {});
 		const zones: ZoneInfo[] = JSON.parse(responses[0].data);
 
 		return zones;

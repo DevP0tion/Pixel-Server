@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { _getUnityServers, _stopUnityServer, _setUnityAlias } from './dashboard.remote';
+	import { _createServer } from './frida.remote.js';
 
 	type UnityServerInfo = {
 		id: string;
@@ -115,6 +116,16 @@
 		goto(`/dashboard/serverInfo?${params.toString()}`);
 	}
 
+	// 서버 생성
+	async function createServer() {
+		try {
+			const result = await _createServer(undefined);
+			console.log('Server created with PID:', result.pid);
+		} catch (error) {
+			console.error('Failed to create server:', error);
+		}
+	}
+
 	// onMount는 필요 없음 - Command API는 자동으로 처리됨
 </script>
 
@@ -129,7 +140,7 @@
 			<h1>Pixel Server Dashboard</h1>
 		</div>
 		<div class="header-right">
-			<button class="btn btn-success" type="button">서버 생성</button>
+			<button class="btn btn-success" type="button" onclick={createServer}>서버 생성</button>
 			<button class="btn btn-primary" onclick={refreshDashboard}>새로고침</button>
 		</div>
 	</header>

@@ -37,6 +37,13 @@ export type CommandResponse = {
 export type ClientType = 'unity' | 'web';
 
 /**
+ * 서버 연결 방식
+ * - frida: Frida로 spawn된 서버
+ * - direct: 직접 연결된 서버
+ */
+export type ServerSource = 'frida' | 'direct';
+
+/**
  * 연결된 클라이언트 정보
  */
 export type ConnectedClient = {
@@ -46,6 +53,7 @@ export type ConnectedClient = {
 	authenticated: boolean;
 	username?: string;
 	connectedAt: Date;
+	serverSource?: ServerSource;
 }
 
 /**

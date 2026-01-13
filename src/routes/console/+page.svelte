@@ -4,6 +4,13 @@
 	import type { PageProps } from './$types';
 	import { handleSvelteCommand } from './console.client';
 	import { _log } from './console.remote';
+	import {
+		_injectScript,
+		_killProcess,
+		_readMemory,
+		_writeMemory,
+		_getFridaServers
+	} from './frida.remote.js';
 	import type { LogEntry, LogType } from '$lib/server/logger';
 
 	let { data }: PageProps = $props();
@@ -16,17 +23,21 @@
 	let commandTarget: LogType = $state('svelte');
 	let selectedUnityServer = $state('all');
 	let connectedUnityServers: Array<{ id: string; name: string }> = $state([]);
+	let selectedFridaServer = $state('');
+	let fridaServers: Array<{ id: string; name: string; pid?: number }> = $state([]);
 
 	let unityServerOptions = $derived([{ id: 'all', name: '모든 서버' }, ...connectedUnityServers]);
 
 	// 로그 필터
 	let filterUnity = $state(true);
 	let filterSvelte = $state(true);
+	let filterUnityControl = $state(true);
 
 	let filteredLogs = $derived(
 		logs.filter((log) => {
 			if (log.type === 'unity' && !filterUnity) return false;
 			if (log.type === 'svelte' && !filterSvelte) return false;
+			if (log.type === 'unity-control' && !filterUnityControl) return false;
 			return true;
 		})
 	);
@@ -37,9 +48,80 @@
 		logContainer.scrollTop = logContainer.scrollHeight;
 	}
 
+	function addLog(type: LogType, message: string) {
+		const entry: LogEntry = {
+			type,
+			message,
+			timestamp: new Date()
+		};
+		logs = [...logs, entry];
+	}
+
+	async function handleUnityControlCommand(input: string) {
+		if (!selectedFridaServer) {
+			addLog('unity-control', 'Frida 서버가 선택되지 않았습니다');
+			return;
+		}
+
+		const [cmd, ...args] = input.split(' ');
+
+		switch (cmd) {
+			case 'inject':
+				const scriptCode = args.join(' ');
+				const result = await _injectScript({
+					serverId: selectedFridaServer,
+					scriptCode
+				});
+				addLog('unity-control', result.message);
+				break;
+
+			case 'kill':
+				const killResult = await _killProcess({ serverId: selectedFridaServer });
+				addLog('unity-control', killResult.message);
+				break;
+
+			case 'read':
+				const [address, size] = args;
+				const readResult = await _readMemory({
+					serverId: selectedFridaServer,
+					address,
+					size: parseInt(size)
+				});
+				addLog('unity-control', readResult.data || readResult.message);
+				break;
+
+			case 'write':
+				const [writeAddr, ...dataBytes] = args;
+				const writeResult = await _writeMemory({
+					serverId: selectedFridaServer,
+					address: writeAddr,
+					data: dataBytes.map((b) => parseInt(b))
+				});
+				addLog('unity-control', writeResult.message);
+				break;
+
+			default:
+				addLog('unity-control', `알 수 없는 명령어: ${cmd}`);
+		}
+	}
+
+	async function loadFridaServers() {
+		const servers = await _getFridaServers(undefined);
+		fridaServers = servers.map((s) => ({
+			id: s.id,
+			name: s.alias,
+			pid: s.pid
+		}));
+		if (fridaServers.length > 0 && !selectedFridaServer) {
+			selectedFridaServer = fridaServers[0].id;
+		}
+	}
+
 	function sendCommand(input: string = commandInput) {
 		if (commandTarget === 'svelte') {
 			handleSvelteCommand(input);
+		} else if (commandTarget === 'unity-control') {
+			handleUnityControlCommand(input);
 		}
 
 		commandInput = '';
@@ -50,7 +132,10 @@
 		logs = data.logs;
 		void scrollLogToBottom();
 
-		const unsubscribe = source('/console')
+		// Frida 서버 목록 로드
+		loadFridaServers();
+
+		const unsubscribe = source('/console/stream')
 			.select('new-log')
 			.subscribe((logJson) => {
 				if (!logJson) return;
@@ -110,6 +195,13 @@
 		>
 			[Svelte] Svelte 서버
 		</button>
+		<button
+			class="toggle-btn toggle-unity-control"
+			class:active={filterUnityControl}
+			onclick={() => (filterUnityControl = !filterUnityControl)}
+		>
+			[Unity 제어] Frida Control
+		</button>
 	</div>
 
 	<!-- 로그 영역 -->
@@ -130,11 +222,19 @@
 				<select bind:value={commandTarget} class="target-dropdown">
 					<option value="unity">Unity</option>
 					<option value="svelte">Svelte</option>
+					<option value="unity-control">Unity 제어</option>
 				</select>
 				{#if commandTarget === 'unity'}
 					<select bind:value={selectedUnityServer} class="unity-server-dropdown">
 						{#each unityServerOptions as server (server.id)}
 							<option value={server.id}>{server.name}</option>
+						{/each}
+					</select>
+				{/if}
+				{#if commandTarget === 'unity-control'}
+					<select bind:value={selectedFridaServer} class="unity-server-dropdown">
+						{#each fridaServers as server (server.id)}
+							<option value={server.id}>{server.name} (PID: {server.pid})</option>
 						{/each}
 					</select>
 				{/if}
@@ -148,7 +248,9 @@
 				}}
 				placeholder={commandTarget === 'svelte'
 					? 'Svelte 콘솔 명령어 입력... (help, clear, status 등)'
-					: 'Unity 서버 명령어 입력...'}
+					: commandTarget === 'unity-control'
+						? 'Frida 명령어 입력... (inject, kill, read, write)'
+						: 'Unity 서버 명령어 입력...'}
 				class="command-input"
 			/>
 			<button class="btn btn-success" onclick={() => sendCommand(commandInput)}>전송</button>
@@ -175,7 +277,8 @@
 
 	$log-colors: (
 		unity: $accent-green,
-		svelte: $accent-blue
+		svelte: $accent-blue,
+		unity-control: $accent-magenta
 	);
 
 	:global(body) {

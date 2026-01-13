@@ -2,7 +2,7 @@ import EventEmitter from 'eventemitter3';
 import fs from 'fs';
 import path from 'path';
 
-export type LogType = 'unity' | 'svelte' | 'input';
+export type LogType = 'unity' | 'svelte' | 'input' | 'unity-control';
 
 export type LogEntry = {
 	type: LogType;

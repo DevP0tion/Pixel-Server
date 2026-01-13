@@ -12,7 +12,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 export async function load() {
-	const projectRoot = process.env.root as string;
+	const projectRoot = (process.env.root as string) ?? '/';
 	const collectorExePath = path.resolve(projectRoot, 'unity', 'Pixel Collector.exe');
 
 	return {
